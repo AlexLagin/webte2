@@ -138,9 +138,9 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
     $db->beginTransaction();
     $fullname = $name . " " . $surname;
     // Skontrolujeme, či už existuje laureát podľa mena a priezviska
-    $checkQuery = "SELECT id FROM laureates WHERE fullname= ?";
+    $checkQuery = "SELECT id FROM laureates WHERE fullname= ? AND organisation = ?";
     $stmt = $db->prepare($checkQuery);
-    $stmt->execute([$fullname]);
+    $stmt->execute([$fullname, $organisation]);
     $existingLaureate = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($existingLaureate) {
