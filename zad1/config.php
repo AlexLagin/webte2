@@ -6,7 +6,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 $hostname = "localhost";
-$database = "nobels";
+$database = "nobels1";
 $username = "xlagin";
 $password = "heslo-1234";
 
