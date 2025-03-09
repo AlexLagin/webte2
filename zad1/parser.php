@@ -13,7 +13,7 @@
     }
 
 
-    $csvData = parseCSV('csvs/nobel_v5.2_MIER.csv');
+    $csvData = parseCSV('csvs/nobel_v5.2_LIT.csv');
 
     // Pre každý riadok v CSV zavoláme funkciu na vloženie záznamu
     foreach ($csvData as $row) {
@@ -22,11 +22,11 @@
         // 6 => country, 7 => contribution-sk, 8 => contribution-en,
         // 9 => language-sk, 10 => language-en, 11 => genre-sk, 12 => genre-en
 
-        list($prize_year, $name, $surname, $organisation, $sex, $birth, $death, $country, $contrib_sk, $contrib_en) = $row;
+        list($prize_year, $name, $surname, $sex, $birth, $death, $country, $contrib_sk, $contrib_en, $language_sk, $language_en, $genre_sk, $genre_en) = $row;
 
         // Pre organizáciu nastavíme NULL; pre kategóriu nastavíme "Literature"
-        $status = insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, $sex, $birth, $death,
-            $country, NULL, NULL, NULL, NULL,
+        $status = insertLaureateWithCountryAndPrize($db, $name, $surname, NULL, $sex, $birth, $death,
+            $country, $language_sk, $language_en, $genre_sk, $genre_en,
             $contrib_sk, $contrib_en, $prize_year, "Chemistry");
         echo $status . "\n";
     }

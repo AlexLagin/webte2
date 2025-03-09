@@ -12,10 +12,10 @@ function processStatement($stmt) {
     }
 }
 
-function insertLaureate($db, $name, $surname, $organisation, $sex, $birth_year, $death_year) {
+function insertLaureate($db, $fullname, $organisation, $sex, $birth_year, $death_year) {
     $stmt = $db->prepare("INSERT INTO laureates (fullname, organisation, sex, birth_year, death_year) VALUES (:fullname, :organisation, :sex, :birth_year, :death_year)");
 
-    $fullname = $name . " " . $surname;
+    //$fullname = $name . " " . $surname;
 
     $stmt->bindParam(':fullname', $fullname, PDO::PARAM_STR);
     $stmt->bindParam(':organisation', $organisation, PDO::PARAM_STR);
@@ -135,20 +135,34 @@ function boundPrize($db, $laureate_id, $prize_id) {
 function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, $sex, $birth_year, $death_year,
                                            $country_name, $language_sk, $language_en, $genre_sk, $genre_en,
                                            $contrib_sk, $contrib_en, $year, $category) {
+    // Začneme transakciu
     $db->beginTransaction();
-    $fullname = $name . " " . $surname;
-    // Skontrolujeme, či už existuje laureát podľa mena a priezviska
-    $checkQuery = "SELECT id FROM laureates WHERE fullname= ? AND organisation = ?";
-    $stmt = $db->prepare($checkQuery);
-    $stmt->execute([$fullname, $organisation]);
+                                            
+    // Rozhodnutie, či ide o organizáciu alebo o osobu
+    if ($organisation != NULL) {
+        echo "\nCau\n";
+        // Ak je vyplnená organizácia, ignorujeme meno a priezvisko
+        $checkQuery = "SELECT id FROM laureates WHERE organisation = ?";
+        $fullname = NULL;
+        $stmt = $db->prepare($checkQuery);
+        $stmt->execute([$organisation]);
+    } else {
+        // Ak nie je organizácia, berieme osobu podľa mena a priezviska
+        $fullname = $name . " " . $surname; 
+        $checkQuery = "SELECT id FROM laureates WHERE fullname = ?";
+        $stmt = $db->prepare($checkQuery);
+        $stmt->execute([$fullname]);
+    }
+
+    // Získame prípadný existujúci záznam
     $existingLaureate = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Ak existuje, vezmeme jeho ID, inak ho vložíme
     if ($existingLaureate) {
-        // Laureát už existuje, použijeme existujúce id
         $laureate_id = $existingLaureate['id'];
     } else {
-        // Vložíme nového laureáta
-        $status = insertLaureate($db, $name, $surname, $organisation, $sex, $birth_year, $death_year);
+        // Zavoláme pôvodnú funkciu insertLaureate, ktorá vloží záznam do tabuľky laureates
+        $status = insertLaureate($db, $fullname, $organisation, $sex, $birth_year, $death_year);
         if (strpos($status, "Error") !== false) {
             $db->rollBack();
             return $status;
@@ -156,14 +170,14 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
         $laureate_id = $db->lastInsertId();
     }
 
-    // Skontrolujeme, či už má daný laureát priradenú krajinu (napr. v prepojovacej tabuľke laureate_country)
+    // Skontrolujeme, či už má tento laureát (osoba/organizácia) priradenú krajinu
     $checkCountryBindingQuery = "SELECT country_id FROM laureate_country WHERE laureate_id = ?";
     $stmt = $db->prepare($checkCountryBindingQuery);
     $stmt->execute([$laureate_id]);
     $existingCountryBinding = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Ak ešte nie je priradená krajina, vložíme/vyberieme existujúcu krajinu a prepojíme
     if (!$existingCountryBinding) {
-        // Najprv skontrolujeme, či záznam o danej krajine už existuje
         $checkCountryQuery = "SELECT id FROM countries WHERE country_name = ?";
         $stmt = $db->prepare($checkCountryQuery);
         $stmt->execute([$country_name]);
@@ -172,7 +186,6 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
         if ($existingCountry) {
             $country_id = $existingCountry['id'];
         } else {
-            // Ak krajina ešte neexistuje, vložíme nový záznam do tabuľky country
             $status = insertCountry($db, $country_name);
             if (strpos($status, "Error") !== false) {
                 $db->rollBack();
@@ -180,16 +193,15 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
             }
             $country_id = $db->lastInsertId();
         }
-        // Prepojíme laureáta s danou krajinou
+
         $status = boundCountry($db, $laureate_id, $country_id);
         if (strpos($status, "Error") !== false) {
             $db->rollBack();
             return $status;
         }
     }
-    // Ak už má prepojenú krajinu, nič nemeníme.
 
-    // Spracujeme cenu: Skontrolujeme, či už existuje záznam o cene pre tohto laureáta, daný rok a kategóriu
+    // Skontrolujeme, či už existuje cena pre daného laureáta za daný rok a kategóriu
     $prizeBoundQuery = "SELECT p.id FROM prizes p
                         INNER JOIN laureates_prizes lp ON p.id = lp.prize_id
                         WHERE lp.laureate_id = ? AND p.category = ? AND p.year = ?";
@@ -197,15 +209,17 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
     $stmt->execute([$laureate_id, $category, $year]);
     $existingPrize = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Ak existuje, len aktualizujeme detaily
     if ($existingPrize) {
-        // Ak už záznam o cene existuje, aktualizujeme len detaily (napr. príspevok)
-        $updatePrizeQuery = "UPDATE prizes SET contrib_sk = ?, contrib_en = ? WHERE id = ?";
+        $updatePrizeQuery = "UPDATE prizes
+                             SET contrib_sk = ?, contrib_en = ?
+                             WHERE id = ?";
         $updateStmt = $db->prepare($updatePrizeQuery);
         $updateStmt->execute([$contrib_sk, $contrib_en, $existingPrize['id']]);
         $prize_id = $existingPrize['id'];
     } else {
-        // Ak cena ešte neexistuje, vložíme nový záznam o cene a prepojíme ho s laureátom
-        $details_id = NULL; // Ak by ste chceli vkladať podrobnosti, môžete túto časť rozvinúť
+        // Ak neexistuje, vložíme nový záznam o cene
+        $details_id = NULL; // Ak by ste potrebovali vkladať detailnejšie info, doplňte
         $status = insertPrize($db, $year, $category, $contrib_sk, $contrib_en, $details_id);
         if (strpos($status, "Error") !== false) {
             $db->rollBack();
@@ -213,6 +227,7 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
         }
         $prize_id = $db->lastInsertId();
 
+        // Prepojíme cenu s laureátom
         $status = boundPrize($db, $laureate_id, $prize_id);
         if (strpos($status, "Error") !== false) {
             $db->rollBack();
@@ -220,12 +235,13 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
         }
     }
 
+    // Ak všetko prebehlo v poriadku, potvrdíme transakciu
     $db->commit();
 
     echo "\nImport dokončený.\n";
-
     return $status;
 }
+
 
 
 
