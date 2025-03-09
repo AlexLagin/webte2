@@ -200,26 +200,15 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
             return $status;
         }
     }
+    
+    if($language_sk != NULL){
+        $status = insertPrizeDetails($db, $language_sk, $language_en, $genre_sk, $genre_en);
+        if (strpos($status, "Error") !== false) {
+            $db->rollBack();
+            return $status;
+        }
+        $details_id = $db->lastInsertId();
 
-    // Skontrolujeme, či už existuje cena pre daného laureáta za daný rok a kategóriu
-    $prizeBoundQuery = "SELECT p.id FROM prizes p
-                        INNER JOIN laureates_prizes lp ON p.id = lp.prize_id
-                        WHERE lp.laureate_id = ? AND p.category = ? AND p.year = ?";
-    $stmt = $db->prepare($prizeBoundQuery);
-    $stmt->execute([$laureate_id, $category, $year]);
-    $existingPrize = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // Ak existuje, len aktualizujeme detaily
-    if ($existingPrize) {
-        $updatePrizeQuery = "UPDATE prizes
-                             SET contrib_sk = ?, contrib_en = ?
-                             WHERE id = ?";
-        $updateStmt = $db->prepare($updatePrizeQuery);
-        $updateStmt->execute([$contrib_sk, $contrib_en, $existingPrize['id']]);
-        $prize_id = $existingPrize['id'];
-    } else {
-        // Ak neexistuje, vložíme nový záznam o cene
-        $details_id = NULL; // Ak by ste potrebovali vkladať detailnejšie info, doplňte
         $status = insertPrize($db, $year, $category, $contrib_sk, $contrib_en, $details_id);
         if (strpos($status, "Error") !== false) {
             $db->rollBack();
@@ -227,11 +216,25 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
         }
         $prize_id = $db->lastInsertId();
 
-        // Prepojíme cenu s laureátom
         $status = boundPrize($db, $laureate_id, $prize_id);
         if (strpos($status, "Error") !== false) {
             $db->rollBack();
             return $status;
+        }
+    } else{
+        $details_id = NULL;
+        $status = insertPrize($db, $year, $category, $contrib_sk, $contrib_en, $details_id);
+        if (strpos($status, "Error") !== false) {
+            $db->rollBack();
+            return $status;
+        }
+        
+        $prize_id = $db->lastInsertId();
+        $status = boundPrize($db, $laureate_id, $prize_id);
+
+        if (strpos($status, "Error") !== false) {
+        $db->rollBack();
+        return $status;
         }
     }
 
