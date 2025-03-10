@@ -246,7 +246,7 @@ function insertLaureateWithCountryAndPrize($db, $name, $surname, $organisation, 
 }
 
 
-
+echo "cuate secja ";
 
 //Example usage
 
