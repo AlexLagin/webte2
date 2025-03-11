@@ -5,7 +5,7 @@ $db = connectDatabase($hostname, $database, $username, $password);
 $sql = "
     SELECT 
         l.id AS laureate_id,
-        l.fullname,
+        COALESCE(l.fullname, l.organisation) AS display_name,
         GROUP_CONCAT(DISTINCT c.country_name SEPARATOR ', ') AS countries,
         p.year,
         p.category,
@@ -18,14 +18,14 @@ $sql = "
     LEFT JOIN prizes p ON lp.prize_id = p.id
     GROUP BY 
         l.id,
-        l.fullname,
+        display_name,
         p.year,
         p.category,
         p.contrib_sk,
         p.contrib_en
     ORDER BY 
         p.year,
-        l.fullname
+        display_name
 ";
 
 $stmt = $db->prepare($sql);
@@ -51,6 +51,7 @@ sort($categories);
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nobeloví laureáti</title>
     <!-- Google Fonts (voliteľné) -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -62,14 +63,21 @@ sort($categories);
             margin: 0;
             padding: 0;
             font-family: 'Open Sans', sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        /* Obalovací kontajner pre hlavný obsah */
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
         }
         
         /* Navigačný bar */
         nav {
-            background-color: #2c3e50; /* Prípadne iná farba podľa potreby */
+            background-color: #2c3e50;
             color: #fff;
             padding: 10px 20px;
-            margin: 0;
         }
         nav .navbar-container {
             display: flex;
@@ -115,8 +123,8 @@ sort($categories);
 
         /* Blok s comboboxom pre počet záznamov */
         #pageSizeContainer {
-            margin: 0 20px 10px; /* ľavý a pravý okraj 20px, spodný okraj 10px */
-            text-align: left;    /* vľavo zarovnané */
+            margin: 0 20px 10px;
+            text-align: left;
         }
 
         /* Tabuľka na 100% šírky */
@@ -124,6 +132,7 @@ sort($categories);
             border-collapse: collapse;
             width: 100%;
             border: 1px solid #000;
+            background-color: #fff;
         }
         th, td {
             border: 1px solid #000;
@@ -171,73 +180,76 @@ sort($categories);
     </div>
 </nav>
 
-<h1>Prehľad Nobelových cien</h1>
+<!-- Obalovací kontajner pre hlavný obsah -->
+<div class="container">
+    <h1>Prehľad Nobelových cien</h1>
 
-<!-- Filtrovanie (Rok, Kategória, Filtrovať) hore -->
-<div id="filters">
-    <label for="yearFilter">Rok:</label>
-    <select id="yearFilter">
-        <option value="">Všetky</option>
-        <?php foreach ($years as $year): ?>
-            <option value="<?php echo htmlspecialchars($year); ?>"><?php echo htmlspecialchars($year); ?></option>
-        <?php endforeach; ?>
-    </select>
+    <!-- Filtrovanie (Rok, Kategória, Filtrovať) hore -->
+    <div id="filters">
+        <label for="yearFilter">Rok:</label>
+        <select id="yearFilter">
+            <option value="">Všetky</option>
+            <?php foreach ($years as $year): ?>
+                <option value="<?php echo htmlspecialchars($year); ?>"><?php echo htmlspecialchars($year); ?></option>
+            <?php endforeach; ?>
+        </select>
 
-    <label for="categoryFilter">Kategória:</label>
-    <select id="categoryFilter">
-        <option value="">Všetky</option>
-        <?php foreach ($categories as $cat): ?>
-            <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
-        <?php endforeach; ?>
-    </select>
-    
-    <button id="applyFilters">Filtrovať</button>
-</div>
+        <label for="categoryFilter">Kategória:</label>
+        <select id="categoryFilter">
+            <option value="">Všetky</option>
+            <?php foreach ($categories as $cat): ?>
+                <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+            <?php endforeach; ?>
+        </select>
+        
+        <button id="applyFilters">Filtrovať</button>
+    </div>
 
-<!-- Blok s comboboxom pre počet záznamov, umiestnený nad tabuľkou, vľavo zarovnaný -->
-<div id="pageSizeContainer">
-    <label for="pageSizeSelect">Počet záznamov na stránku:</label>
-    <select id="pageSizeSelect">
-        <option value="20" selected>20</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-        <option value="500">500</option>
-        <option value="all">Všetky</option>
-    </select>
-</div>
+    <!-- Blok s comboboxom pre počet záznamov, umiestnený nad tabuľkou, vľavo zarovnaný -->
+    <div id="pageSizeContainer">
+        <label for="pageSizeSelect">Počet záznamov na stránku:</label>
+        <select id="pageSizeSelect">
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="500">500</option>
+            <option value="all">Všetky</option>
+        </select>
+    </div>
 
-<!-- Tabuľka (na celú šírku) -->
-<table id="laureatesTable">
-    <thead>
-    <tr>
-        <th class="yearColumn sortable">Rok <span class="sort-indicator"></span></th>
-        <th class="categoryColumn sortable">Kategória <span class="sort-indicator"></span></th>
-        <th class="sortable">Meno <span class="sort-indicator"></span></th>
-        <th>Krajina</th>
-        <th>Príspevok (SK)</th>
-        <th>Príspevok (EN)</th>
-    </tr>
-    </thead>
-    <tbody>
-    <?php foreach ($results as $row): ?>
+    <!-- Tabuľka (na celú šírku) -->
+    <table id="laureatesTable">
+        <thead>
         <tr>
-            <td class="yearColumn"><?php echo htmlspecialchars($row['year']); ?></td>
-            <td class="categoryColumn"><?php echo htmlspecialchars($row['category']); ?></td>
-            <td>
-                <a href="details.php?laureate_id=<?php echo urlencode($row['laureate_id']); ?>">
-                    <?php echo htmlspecialchars($row['fullname']); ?>
-                </a>
-            </td>
-            <td><?php echo htmlspecialchars($row['countries']); ?></td>
-            <td><?php echo htmlspecialchars($row['contrib_sk']); ?></td>
-            <td><?php echo htmlspecialchars($row['contrib_en']); ?></td>
+            <th class="yearColumn sortable">Rok <span class="sort-indicator"></span></th>
+            <th class="categoryColumn sortable">Kategória <span class="sort-indicator"></span></th>
+            <th class="sortable">Meno / Organizácia <span class="sort-indicator"></span></th>
+            <th>Krajina</th>
+            <th>Príspevok (SK)</th>
+            <th>Príspevok (EN)</th>
         </tr>
-    <?php endforeach; ?>
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+        <?php foreach ($results as $row): ?>
+            <tr>
+                <td class="yearColumn"><?php echo htmlspecialchars($row['year']); ?></td>
+                <td class="categoryColumn"><?php echo htmlspecialchars($row['category']); ?></td>
+                <td>
+                    <a href="details.php?laureate_id=<?php echo urlencode($row['laureate_id']); ?>">
+                        <?php echo htmlspecialchars($row['display_name']); ?>
+                    </a>
+                </td>
+                <td><?php echo htmlspecialchars($row['countries']); ?></td>
+                <td><?php echo htmlspecialchars($row['contrib_sk']); ?></td>
+                <td><?php echo htmlspecialchars($row['contrib_en']); ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
 
-<!-- Kontrolné prvky stránkovania -->
-<div id="pagination"></div>
+    <!-- Kontrolné prvky stránkovania -->
+    <div id="pagination"></div>
+</div>
 
 <!-- jQuery knižnica -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -291,7 +303,8 @@ $(document).ready(function() {
         paginateTable();
     }
 
-    // Funkcia pre stránkovanie, ktorá pracuje s globálnou premennou filteredRows
+    // Funkcia pre stránkovanie s dynamickým rozsahom 5 strán
+    // a zobrazením bodiek a poslednej stránky, ak aktuálny rozsah neobsahuje poslednú stránku
     function paginateTable() {
         var pageSize = $('#pageSizeSelect').val();
         if(pageSize === "all") {
@@ -308,21 +321,44 @@ $(document).ready(function() {
         filteredRows.slice((currentPage - 1) * numericPageSize, currentPage * numericPageSize).show();
 
         var paginationHtml = '';
-        if(totalPages > 1) {
-            if(currentPage > 1) {
-                paginationHtml += '<a href="#" class="page" data-page="'+(currentPage - 1)+'">Predchádzajúca</a> ';
-            }
-            for(var i = 1; i <= totalPages; i++){
-                if(i === currentPage) {
-                    paginationHtml += '<span class="current-page">' + i + '</span> ';
-                } else {
-                    paginationHtml += '<a href="#" class="page" data-page="'+ i +'">' + i + '</a> ';
-                }
-            }
-            if(currentPage < totalPages) {
-                paginationHtml += '<a href="#" class="page" data-page="'+(currentPage + 1)+'">Ďalšia</a>';
+
+        // Odkaz na predchádzajúcu stránku
+        if(currentPage > 1) {
+            paginationHtml += '<a href="#" class="page" data-page="'+ (currentPage - 1) +'">Predchádzajúca</a> ';
+        }
+
+        // Dynamicky vypočítame rozsah strán: aktuálna stránka so 2 pred a 2 za ňou
+        var startPage = currentPage - 2;
+        var endPage = currentPage + 2;
+        if(startPage < 1) {
+            startPage = 1;
+            endPage = Math.min(5, totalPages);
+        }
+        if(endPage > totalPages) {
+            endPage = totalPages;
+            startPage = Math.max(1, totalPages - 4);
+        }
+
+        // Vypíšeme čísla strán od startPage do endPage
+        for(var i = startPage; i <= endPage; i++){
+            if(i === currentPage) {
+                paginationHtml += '<span class="current-page">' + i + '</span> ';
+            } else {
+                paginationHtml += '<a href="#" class="page" data-page="'+ i +'">' + i + '</a> ';
             }
         }
+
+        // Ak endPage nie je posledná stránka, pridáme bodky a odkaz na poslednú stránku
+        if(endPage < totalPages) {
+            paginationHtml += '......';
+            paginationHtml += '<a href="#" class="page" data-page="'+ totalPages +'">' + totalPages + '</a> ';
+        }
+
+        // Odkaz na ďalšiu stránku
+        if(currentPage < totalPages) {
+            paginationHtml += '<a href="#" class="page" data-page="'+ (currentPage + 1) +'">Ďalšia</a>';
+        }
+        
         $('#pagination').html(paginationHtml);
     }
 
@@ -339,7 +375,7 @@ $(document).ready(function() {
         paginateTable();
     }
 
-    // Event handler pre kliknutie na klikateľné hlavičky (Rok, Kategória, Meno)
+    // Event handler pre kliknutie na klikateľné hlavičky (Rok, Kategória, Meno / Organizácia)
     $('#laureatesTable thead th.sortable').on('click', function() {
         // Odstránime všetky indikátory zoradenia
         $('#laureatesTable thead th.sortable .sort-indicator').html('');

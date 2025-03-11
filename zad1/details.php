@@ -12,14 +12,12 @@ if (!isset($_GET['laureate_id'])) {
 $laureateId = $_GET['laureate_id'];
 
 /*
-    Príklad dopytu (prispôsobte podľa vašej DB):
-    - JOIN na 'prize_details' (alias pd) pre jazyk/žáner, ak to máte takto nastavené.
-    - Môžete použiť predchádzajúci JOIN, ak je to inak.
+    Dotaz je upravený tak, že ak je fullname NULL, vráti sa hodnota z organisation.
 */
 $sql = "
     SELECT
         l.id,
-        l.fullname,
+        COALESCE(l.fullname, l.organisation) AS display_name,
         l.birth_year,
         l.death_year,
         l.sex,
@@ -46,7 +44,7 @@ $sql = "
 
     GROUP BY
         l.id,
-        l.fullname,
+        display_name,
         l.birth_year,
         l.death_year,
         l.sex,
@@ -61,7 +59,7 @@ $sql = "
 
     ORDER BY
         p.year,
-        l.fullname
+        display_name
 ";
 
 $stmt = $db->prepare($sql);
@@ -232,7 +230,7 @@ foreach ($results as $row) {
         <?php
             // Zobrazíme osobné údaje z prvého záznamu
             $firstRow = $results[0];
-            $fullname    = $firstRow['fullname'];
+            $displayName = $firstRow['display_name'];
             $countries   = $firstRow['countries'];
             $birthYear   = $firstRow['birth_year'];
             $deathYear   = $firstRow['death_year'];
@@ -240,7 +238,7 @@ foreach ($results as $row) {
         ?>
 
         <div class="info-box">
-            <h2><?php echo htmlspecialchars($fullname); ?></h2>
+            <h2><?php echo htmlspecialchars($displayName); ?></h2>
             <p><strong>Krajina:</strong> <?php echo htmlspecialchars($countries); ?></p>
             <p><strong>Rok narodenia:</strong>
                 <?php echo $birthYear ? htmlspecialchars($birthYear) : '—'; ?>
@@ -307,7 +305,7 @@ foreach ($results as $row) {
             </tbody>
         </table>
 
-        <!-- Tlačidlo Späť (vedie na hlavnú stránku s laureátmi, napr. index(10).php) -->
+        <!-- Tlačidlo Späť (vedie na hlavnú stránku s laureátmi, napr. index.php) -->
         <a class="back-button" href="index.php">Späť na zoznam laureátov</a>
 
     <?php endif; ?>
