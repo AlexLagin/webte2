@@ -164,8 +164,8 @@ sort($categories);
     <div class="navbar-container">
         <div class="navbar-title">Nobelove stránky</div>
         <ul class="navbar-links">
-            <li><a href="node73.webte.fei.stuba.sk/zad1/index.php">Laureáti</a></li>
-            <li><a href="#">Prihlásenie</a></li>
+            <li><a href="index.php">Laureáti</a></li>
+            <li><a href="login.php">Prihlásenie</a></li>
             <li><a href="#">Registrácia</a></li>
         </ul>
     </div>
@@ -224,7 +224,7 @@ sort($categories);
             <td class="yearColumn"><?php echo htmlspecialchars($row['year']); ?></td>
             <td class="categoryColumn"><?php echo htmlspecialchars($row['category']); ?></td>
             <td>
-                <a href="detail.php?laureate_id=<?php echo urlencode($row['laureate_id']); ?>">
+                <a href="details.php?laureate_id=<?php echo urlencode($row['laureate_id']); ?>">
                     <?php echo htmlspecialchars($row['fullname']); ?>
                 </a>
             </td>
