@@ -12,8 +12,9 @@ if (!isset($_GET['laureate_id'])) {
 $laureateId = $_GET['laureate_id'];
 
 /*
-    Príklad SQL dopytu, ktorý JOINuje prize_details (alias pd).
-    Musíte mať stĺpce pd.language_en, pd.language_sk, pd.genre_en, pd.genre_sk.
+    Príklad dopytu (prispôsobte podľa vašej DB):
+    - JOIN na 'prize_details' (alias pd) pre jazyk/žáner, ak to máte takto nastavené.
+    - Môžete použiť predchádzajúci JOIN, ak je to inak.
 */
 $sql = "
     SELECT
@@ -23,43 +24,41 @@ $sql = "
         l.death_year,
         l.sex,
         GROUP_CONCAT(DISTINCT c.country_name SEPARATOR ', ') AS countries,
-        
+
         p.year,
         p.category,
         p.contrib_en,
         p.contrib_sk,
-        
+
         pd.language_en,
         pd.language_sk,
         pd.genre_en,
         pd.genre_sk
-        
+
     FROM laureates l
     LEFT JOIN laureate_country lc ON l.id = lc.laureate_id
     LEFT JOIN countries c ON lc.country_id = c.id
     LEFT JOIN laureates_prizes lp ON l.id = lp.laureate_id
     LEFT JOIN prizes p ON lp.prize_id = p.id
     LEFT JOIN prize_details pd ON p.details_id = pd.id
-    
+
     WHERE l.id = :laureateId
-    
+
     GROUP BY
         l.id,
         l.fullname,
         l.birth_year,
         l.death_year,
         l.sex,
-        
         p.year,
         p.category,
         p.contrib_en,
         p.contrib_sk,
-        
         pd.language_en,
         pd.language_sk,
         pd.genre_en,
         pd.genre_sk
-        
+
     ORDER BY
         p.year,
         l.fullname
@@ -73,7 +72,6 @@ $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Zistíme, či aspoň jedna kategória je "Literatúra"
 $hasLiterature = false;
 foreach ($results as $row) {
-    // Porovnáme s presnou hodnotou, prípadne to upravte na nižšie/vyššie
     if (strtolower($row['category']) === 'literatúra') {
         $hasLiterature = true;
         break;
@@ -86,15 +84,15 @@ foreach ($results as $row) {
 <head>
     <meta charset="UTF-8">
     <title>Detail laureáta</title>
+    <!-- Google Fonts pre krajší vzhľad -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-
     <style>
         html, body {
-            margin: 0;
+            margin: 0; 
             padding: 0;
             font-family: 'Open Sans', sans-serif;
-            background-color: #f2f2f2;
+            background-color: #f2f2f2; 
             color: #333;
         }
         nav {
@@ -192,6 +190,23 @@ foreach ($results as $row) {
         tbody tr:last-child td {
             border-bottom: none;
         }
+
+        /* Štýl pre button "Späť" */
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            text-decoration: none;
+        }
+        .back-button:hover {
+            background-color: #2980b9;
+        }
     </style>
 </head>
 <body>
@@ -240,6 +255,17 @@ foreach ($results as $row) {
 
         <h1 class="ocenenie-title">Ocenenie</h1>
 
+        <!-- Zistíme, či aspoň jedna kategória je "Literatúra" -->
+        <?php
+            $hasLiterature = false;
+            foreach ($results as $row) {
+                if (strtolower($row['category']) === 'literatúra') {
+                    $hasLiterature = true;
+                    break;
+                }
+            }
+        ?>
+
         <table>
             <thead>
                 <tr>
@@ -247,8 +273,6 @@ foreach ($results as $row) {
                     <th>Kategória</th>
                     <th>Príspevok (EN)</th>
                     <th>Príspevok (SK)</th>
-
-                    <!-- IBA ak existuje aspoň 1 "Literatúra" -->
                     <?php if ($hasLiterature): ?>
                         <th>Jazyk (EN)</th>
                         <th>Jazyk (SK)</th>
@@ -265,9 +289,7 @@ foreach ($results as $row) {
                     <td><?php echo htmlspecialchars($row['contrib_en']); ?></td>
                     <td><?php echo htmlspecialchars($row['contrib_sk']); ?></td>
 
-                    <!-- IBA ak existuje aspoň 1 "Literatúra", zobrazíme stĺpce. -->
                     <?php if ($hasLiterature): ?>
-                        <!-- Ak daný riadok NIE je Literatúra, dáme pomlčku, inak skutočné údaje -->
                         <?php if (strtolower($row['category']) === 'literatúra'): ?>
                             <td><?php echo htmlspecialchars($row['language_en']); ?></td>
                             <td><?php echo htmlspecialchars($row['language_sk']); ?></td>
@@ -280,11 +302,13 @@ foreach ($results as $row) {
                             <td>—</td>
                         <?php endif; ?>
                     <?php endif; ?>
-
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
+
+        <!-- Tlačidlo Späť (vedie na hlavnú stránku s laureátmi, napr. index(10).php) -->
+        <a class="back-button" href="index.php">Späť na zoznam laureátov</a>
 
     <?php endif; ?>
 </div>
