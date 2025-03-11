@@ -10,6 +10,8 @@ $database = "nobels1";
 $username = "xlagin";
 $password = "heslo-1234";
 
+
+$pdo =connectDatabase($hostname, $database, $username, $password);
 // Connect to the database using PDO
 function connectDatabase($hostname, $database, $username, $password) {
     try {
