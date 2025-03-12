@@ -1,5 +1,4 @@
 <?php
-
 session_start();
 
 // Check if the user is already logged in, if yes then redirect him to welcome page
@@ -15,7 +14,7 @@ require_once 'utilities.php';
 use RobThree\Auth\Providers\Qr\BaconQrCodeProvider;
 use RobThree\Auth\Providers\Qr\EndroidQrCodeProvider;
 use RobThree\Auth\TwoFactorAuth;
-
+$redirect_uri = "https://node73.webte.fei.stuba.sk/zad1/oauth2callback.php";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $errors = "";
 
@@ -23,7 +22,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isEmpty($_POST['email']) === true) {
         $errors .= "Nevyplnený e-mail.\n";
     }
-
     // TODO: validate if user entered correct e-mail format
 
     // Validate user existence
@@ -32,22 +30,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         die();
     }
 
-    // Vaidate name and surname
+    // Validate name and surname
     if (isEmpty($_POST['firstname']) === true) {
         $errors .= "Nevyplnené meno.\n";
     } elseif (isEmpty($_POST['lastname']) === true) {
         $errors .= "Nevyplnené priezvisko.\n";
     }
-
     // TODO: Implement name and surname length validation based on the database column length.
     // TODO: Implement name and surname allowed characters validation.
-
 
     // Validate password
     if (isEmpty($_POST['password']) === true) {
         $errors .= "Nevyplnené heslo.\n";
     }
-
     // TODO: Implement repeat password validation.
     // TODO: Sanitize and validate all user inputs.
 
@@ -81,99 +76,151 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     unset($pdo);
 }
-
 ?>
 
 <!doctype html>
 <html lang="sk">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Registrácia</title>
+    <!-- Načítanie Bootstrap CSS (rovnako ako v login(1).php) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
-        html {
-            max-width: 70ch;
-            padding: 3em 1em;
-            margin: auto;
-            line-height: 1.75;
-            font-size: 1.25em;
+        /* Rovnaké CSS ako v login(1).php */
+        body {
+            background-color: #f4f7f9;
+            margin: 0;
+            padding: 0;
         }
-        h1,h2,h3,h4,h5,h6 {
-            margin: 3em 0 1em;
+        nav {
+            background: linear-gradient(135deg, #2c3e50, #2f4254);
+            color: #fff;
+            padding: 10px 20px;
+            margin: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
-        p,ul,ol {
-            margin-bottom: 2em;
-            color: #1d1d1d;
-            font-family: sans-serif;
+        nav .navbar-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
         }
-        span, .err {
-            color: red;
+        nav .navbar-title {
+            font-size: 1.6em;
+            font-weight: 600;
+        }
+        nav .navbar-links {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+        nav .navbar-links li {
+            margin-left: 20px;
+        }
+        nav .navbar-links a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        nav .navbar-links a:hover {
+            color: #ddd;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .card {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 
 <body>
-    <header>
-        <hgroup>
-            <h1>Registrácia</h1>
-            <h2>Vytvorenie nového používateľského konta</h2>
-        </hgroup>
-    </header>
-    <main>
-        <?php if (isset($reg_status)) {
-            echo "<h3>$reg_status</h3>";
-        } ?>
-        <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="post">
-            <!-- TODO: Error messages should be separated for corresponding input and as in WEBTE1,
-                       they must contain meaningful explanation, why the input is incorrect. Use a JS
-                       framework. -->
-            <label for="firstname">
-                Meno:
-                <input type="text" name="firstname" value="" id="firstname" placeholder="napr. John">
-            </label>
+    <!-- Navigačný bar, rovnaký ako v login(1).php -->
+    <nav>
+        <div class="navbar-container">
+            <div class="navbar-title">Názov stránky</div>
+            <ul class="navbar-links">
+                <li><a href="index.php">Zoznam laureátov</a></li>
+                <li><a href="login.php">Prihlásenie</a></li>
+            </ul>
+        </div>
+    </nav>
 
-            <label for="lastname">
-                Priezvisko:
-                <input type="text" name="lastname" value="" id="lastname" placeholder="napr. Doe">
-            </label>
+    <div class="container">
+      <div class="row justify-content-center">
+          <div class="col-md-6">
+              <div class="card">
+                  <div class="card-header text-center">
+                      <h3>Registrácia</h3>
+                      <p>Vytvorenie nového používateľského konta</p>
+                  </div>
+                  <div class="card-body">
+                      <!-- Výpis prípadného statusu registrácie -->
+                      <?php if (isset($reg_status)) { ?>
+                          <div class="alert alert-success"><?php echo $reg_status; ?></div>
+                      <?php } ?>
 
-            <br>
+                      <!-- Výpis chýb, ak existujú -->
+                      <?php if (!empty($errors)) { ?>
+                          <div class="alert alert-danger">
+                              <strong>Chyby:</strong><br>
+                              <?php echo nl2br($errors); ?>
+                          </div>
+                      <?php } ?>
 
-            <label for="email">
-                E-mail:
-                <input type="email" name="email" value="" id="email" placeholder="napr. johndoe@example.com">
-            </label>
+                      <!-- Formulár pre registráciu -->
+                      <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="post">
+                          <div class="mb-3">
+                              <label for="firstname" class="form-label">Meno:</label>
+                              <input type="text" name="firstname" id="firstname" class="form-control" placeholder="napr. John">
+                          </div>
+                          <div class="mb-3">
+                              <label for="lastname" class="form-label">Priezvisko:</label>
+                              <input type="text" name="lastname" id="lastname" class="form-control" placeholder="napr. Doe">
+                          </div>
+                          <div class="mb-3">
+                              <label for="email" class="form-label">E-mail:</label>
+                              <input type="email" name="email" id="email" class="form-control" placeholder="napr. johndoe@example.com">
+                          </div>
+                          <div class="mb-3">
+                              <label for="password" class="form-label">Heslo:</label>
+                              <input type="password" name="password" id="password" class="form-control">
+                          </div>
+                          <div class="d-grid gap-2">
+                              <button type="submit" class="btn btn-primary">Vytvoriť konto</button>
+                          </div>
+                      </form>
 
-            <label for="password">
-                Heslo:
-                <input type="password" name="password" value="" id="password">
-            </label>
+                      <!-- Ak sa vygeneruje QR kód (po úspešnej registrácii), zobraz ho -->
+                      <?php if (isset($qr_code)) : ?>
+                          <hr>
+                          <p>Zadajte kód: <strong><?php echo $user_secret; ?></strong> do aplikácie pre 2FA.</p>
+                          <p>alebo naskenujte QR kód:<br>
+                             <img src="<?php echo $qr_code; ?>" alt="qr kod pre aplikaciu authenticator">
+                          </p>
+                          <p>Teraz sa môžete prihlásiť: <a href="login.php">Login stránka</a></p>
+                      <?php endif; ?>
 
-            <button type="submit">Vytvoriť konto</button>
+                      <hr>
+                      <p class="text-center">
+                          Už máte vytvorené konto? <a href="login.php">Prihláste sa tu.</a>
+                      </p>
+                      <p class="text-center">
+                          Alebo sa prihláste pomocou 
+                          <a href="<?php echo filter_var($redirect_uri, FILTER_SANITIZE_URL) ?>">Google konta</a>
+                      </p>
+                  </div>
+              </div>
+          </div>
+      </div>
+    </div>
 
-            <?php
-            if (!empty($errors)) {
-                echo "<br><strong>Chyby:</strong><br>";
-                echo "<div class='err'>";
-                echo nl2br($errors);
-                echo "</div>";
-            }
-            if (isset($qr_code)) {
-                // If a QR code was generated after successful registration, display it.
-                $message = '<p>Zadajte kód: ' . $user_secret . ' do aplikácie pre 2FA</p>';
-                $message .= '<p>alebo naskenujte QR kód:<br><img src="' . $qr_code . '" alt="qr kod pre aplikaciu authenticator"></p>';
-                echo $message;
-                echo '<p>Teraz sa môžete prihlásiť: <a href="login.php">Login stránka</a></p>';
-            }
-            ?>
-
-        </form>
-        <p>Už máte vytvorené konto? <a href="login.php">Prihláste sa tu.</a></p>
-    </main>
+    <!-- Načítanie Bootstrap JS (rovnako ako v login(1).php) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-
 </html>
