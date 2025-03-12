@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-// Ak je užívateľ prihlásený, presmeruj ho na restricted.php.
+// Ak je používateľ prihlásený, presmeruj ho na restricted.php.
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
     header("location: restricted.php");
     exit;
@@ -119,8 +119,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $row = $stmt->fetch();
             $hashed_password = $row["password"];
 
-            // Overenie hesla (ešte raz pre istotu, 
-            // hoci predtým už bolo overené AJAX-om)
+            // Overenie hesla (ešte raz pre istotu)
             if (password_verify($_POST['password'], $hashed_password)) {
                 // Overíme 2FA kód
                 $tfa = new TwoFactorAuth(new EndroidQrCodeProvider());
@@ -232,12 +231,31 @@ unset($pdo);
     <!-- Navigačný bar -->
     <nav>
         <div class="navbar-container">
-            <div class="navbar-title">Názov stránky</div>
+            <div class="navbar-title">Prihlásenie</div>
             <ul class="navbar-links">
                 <li><a href="index.php">Zoznam laureátov</a></li>
             </ul>
         </div>
     </nav>
+
+    <!-- MODAL o cookies -->
+    <div class="modal fade" id="cookiesModal" tabindex="-1" aria-labelledby="cookiesModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cookiesModalLabel">Informácia o cookies</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zavrieť"></button>
+          </div>
+          <div class="modal-body">
+            Táto stránka používa cookies na zabezpečenie plnej funkčnosti a zlepšenie vášho zážitku.
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Rozumiem</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Koniec MODAL -->
 
     <!-- Hlavný obsah stránky -->
     <div class="container">
@@ -306,6 +324,10 @@ unset($pdo);
                       <p class="text-center">
                           Nemáte vytvorené konto? <a href="register.php">Zaregistrujte sa tu.</a>
                       </p>
+                      <!-- Nový text "Zabudnuté heslo?" -> redirect na forgotPW.php -->
+                      <p class="text-center">
+                          <a href="forgotPW.php">Zabudnuté heslo?</a>
+                      </p>
                   </div>
               </div>
           </div>
@@ -315,9 +337,15 @@ unset($pdo);
     <!-- Načítanie Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- JavaScript: AJAX kontrola používateľa, overenie emailu a hesla, zabránenie skorému submitu -->
+    <!-- JavaScript: zobrazenie modalu cookies, AJAX kontrola používateľa, overenie emailu a hesla, zabránenie skorému submitu -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {
+        // Zobrazíme modal s cookies hneď po načítaní
+        var cookiesModal = new bootstrap.Modal(document.getElementById('cookiesModal'), {
+          keyboard: false
+        });
+        cookiesModal.show();
+
         const loginForm      = document.getElementById('loginForm');
         const emailInput     = document.getElementById('email');
         const userCheckMsg   = document.getElementById('userCheckMessage');

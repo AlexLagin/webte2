@@ -65,6 +65,43 @@ sort($categories);
             font-family: 'Open Sans', sans-serif;
             background-color: #f5f5f5;
         }
+
+        nav {
+            background: linear-gradient(135deg, #2c3e50, #2f4254);
+            color: #fff;
+            padding: 10px 20px;
+            margin: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        nav .navbar-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        nav .navbar-title {
+            font-size: 1.6em;
+            font-weight: 600;
+        }
+        nav .navbar-links {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+        nav .navbar-links li {
+            margin-left: 20px;
+        }
+        nav .navbar-links a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        nav .navbar-links a:hover {
+            color: #ddd;
+        }
         
         /* Obalovací kontajner pre hlavný obsah */
         .container {
@@ -171,7 +208,7 @@ sort($categories);
 <!-- Navigačný bar -->
 <nav>
     <div class="navbar-container">
-        <div class="navbar-title">Nobelove stránky</div>
+        <div class="navbar-title">Nobeloví laureáti</div>
         <ul class="navbar-links">
             <li><a href="index.php">Laureáti</a></li>
             <li><a href="login.php">Prihlásenie</a></li>
@@ -182,7 +219,6 @@ sort($categories);
 
 <!-- Obalovací kontajner pre hlavný obsah -->
 <div class="container">
-    <h1>Prehľad Nobelových cien</h1>
 
     <!-- Filtrovanie (Rok, Kategória, Filtrovať) hore -->
     <div id="filters">
