@@ -212,7 +212,7 @@ foreach ($results as $row) {
 <!-- Navigačný bar -->
 <nav>
     <div class="navbar-container">
-        <div class="navbar-title">Nobelove stránky</div>
+        <div class="navbar-title">Detaily</div>
         <ul class="navbar-links">
             <li><a href="index.php">Zoznam laureátov</a></li>
             <li><a href="login.php">Prihlásenie</a></li>
