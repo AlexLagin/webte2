@@ -1,8 +1,7 @@
 <?php
-
 session_start();
 
-// Check if the user is already logged in, if yes then redirect him to restricted page.
+// Ak je užívateľ prihlásený, presmeruj ho na restricted.php.
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
     header("location: restricted.php");
     exit;
@@ -15,14 +14,12 @@ require_once 'utilities.php';
 use RobThree\Auth\Providers\Qr\EndroidQrCodeProvider;
 use RobThree\Auth\TwoFactorAuth;
 
-// Redirect users to outh2call.php which redirects users to Google OAuth 2.0
+// URL pre prihlásenie pomocou Google OAuth 2.0
 $redirect_uri = "https://node73.webte.fei.stuba.sk/zad1/oauth2callback.php";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // TODO: Implement login credentials verification.
-    // TODO: Implement a mechanism to save login information - user_id, login_type, email, fullname - to database.
-
+    // Overenie prihlasovacích údajov.
     $sql = "SELECT id, fullname, email, password, 2fa_code, created_at FROM users WHERE email = :email";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(":email", $_POST["email"], PDO::PARAM_STR);
@@ -30,27 +27,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if ($stmt->execute()) {
         if ($stmt->rowCount() == 1) {
-            // User exists, check password.
+            // Užívateľ existuje, over heslo.
             $row = $stmt->fetch();
             $hashed_password = $row["password"];
 
             if (password_verify($_POST['password'], $hashed_password)) {
-                // Password is correct.
+                // Heslo je správne, over 2FA kód.
                 $tfa = new TwoFactorAuth(new EndroidQrCodeProvider());
                 if ($tfa->verifyCode($row["2fa_code"], $_POST['2fa'], 2)) {
-                    // Password and code are correct, user authenticated.
-
-                    // Save user data to session.
+                    // Prihlasovacie údaje sú správne – ulož do session.
                     $_SESSION["loggedin"] = true;
                     $_SESSION["fullname"] = $row['fullname'];
                     $_SESSION["email"] = $row['email'];
                     $_SESSION["created_at"] = $row['created_at'];
 
-                    // Redirect user to restricted page.
                     header("location: restricted.php");
-                }
-                else {
-                    $errors = "Neplatný kod 2FA.";
+                    exit;
+                } else {
+                    $errors = "Neplatný 2FA kód.";
                 }
             } else {
                 $errors = "Nesprávne meno alebo heslo.";
@@ -65,79 +59,132 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     unset($stmt);
     unset($pdo);
 }
-
 ?>
 
 <!doctype html>
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Prihlásenie</title>
-
+    <!-- Načítanie Bootstrap CSS pre základné štýly (voliteľné, ak potrebuješ ďalšie komponenty) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        html {
-            max-width: 70ch;
-            padding: 3em 1em;
-            margin: auto;
-            line-height: 1.75;
-            font-size: 1.25em;
+        body {
+            background-color: #f4f7f9;
+            margin: 0;
+            padding: 0;
         }
-
-        h1,h2,h3,h4,h5,h6 {
-            margin: 3em 0 1em;
+        /* Navigačný bar zo details.php */
+        nav {
+            background: linear-gradient(135deg, #2c3e50, #2f4254);
+            color: #fff;
+            padding: 10px 20px;
+            margin: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
-
-        p,ul,ol {
-            margin-bottom: 2em;
-            color: #1d1d1d;
-            font-family: sans-serif;
+        nav .navbar-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        nav .navbar-title {
+            font-size: 1.6em;
+            font-weight: 600;
+        }
+        nav .navbar-links {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+        nav .navbar-links li {
+            margin-left: 20px;
+        }
+        nav .navbar-links a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        nav .navbar-links a:hover {
+            color: #ddd;
+        }
+        /* Štýly pre formulár */
+        .container {
+            margin-top: 50px;
+        }
+        .card {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body>
-<header>
-    <hgroup>
-        <h1>Prihlásenie</h1>
-        <h2>Prihlasenie registrovaného používateľa</h2>
-    </hgroup>
-</header>
-<main>
-    <?php if (isset($errors)) {
-        echo "<strong style='color: red'>$errors</strong>";
-    } ?>
+    <!-- Navigačný bar s použitým štýlom -->
+    <nav>
+        <div class="navbar-container">
+            <div class="navbar-title">Názov stránky</div>
+            <ul class="navbar-links">
+                <li><a href="index.php">Zoznam laureátov</a></li>
+            </ul>
+        </div>
+    </nav>
 
-    <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="post">
+    <!-- Hlavný obsah stránky -->
+    <div class="container">
+      <div class="row justify-content-center">
+          <div class="col-md-6">
+              <div class="card">
+                  <div class="card-header text-center">
+                      <h3>Prihlásenie</h3>
+                      <p>Prihlasenie registrovaného používateľa</p>
+                  </div>
+                  <div class="card-body">
+                      <?php if (isset($errors) && !empty($errors)) { ?>
+                          <div class="alert alert-danger"><?php echo $errors; ?></div>
+                      <?php } ?>
+                      <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="post">
+                          <div class="mb-3">
+                              <label for="email" class="form-label">E-Mail:</label>
+                              <input type="email" name="email" id="email" class="form-control" required>
+                          </div>
+                          <div class="mb-3">
+                              <label for="password" class="form-label">Heslo:</label>
+                              <input type="password" name="password" id="password" class="form-control" required>
+                          </div>
+                          <div class="mb-3">
+                              <label for="2fa" class="form-label">2FA kód:</label>
+                              <!-- Skryté zadávanie a obmedzenie na čísla -->
+                              <input 
+                                  type="password" 
+                                  name="2fa" 
+                                  id="2fa" 
+                                  class="form-control" 
+                                  required 
+                                  pattern="\d*" 
+                                  inputmode="numeric"
+                              >
+                          </div>
+                          <div class="d-grid gap-2">
+                              <button type="submit" class="btn btn-primary">Prihlásiť sa</button>
+                          </div>
+                      </form>
+                      <hr>
+                      <p class="text-center">
+                          Alebo sa prihláste pomocou <a href="<?php echo filter_var($redirect_uri, FILTER_SANITIZE_URL) ?>">Google konta</a>
+                      </p>
+                      <p class="text-center">
+                          Nemáte vytvorené konto? <a href="register.php">Zaregistrujte sa tu.</a>
+                      </p>
+                  </div>
+              </div>
+          </div>
+      </div>
+    </div>
 
-        <label for="email">
-            E-Mail:
-            <input type="text" name="email" value="" id="email" required>
-        </label>
-        <br>
-        <label for="password">
-            Heslo:
-            <input type="password" name="password" value="" id="password" required>
-        </label>
-        <br>
-
-        <!-- TODO: Use JavaScript to hide/show the 2FA field after successfull password enter,
-                   and only after completing the 2FA code, the user is logged in. -->
-
-        <label for="2fa">
-            2FA kód:
-            <input type="number" name="2fa" value="" id="2fa" required>
-        </label>
-
-        <button type="submit">Prihlásiť sa</button>
-        <br>
-        <p>Alebo sa prihláste pomocou <a href="<?php echo filter_var($redirect_uri, FILTER_SANITIZE_URL) ?>">Google konta</a></p>
-
-        <!-- TODO: Create a "I forgot password"/"Reset my password" option -->
-
-    </form>
-    <p>Nemáte vytvorené konto? <a href="register.php">Zaregistrujte sa tu.</a></p>
-</main>
+    <!-- Načítanie Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
