@@ -76,7 +76,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isEmpty($_POST['password']) === true) {
         $errors .= "Nevyplnené heslo.\n";
     }
-    // (Nepovinné, ale vhodné: Skontrolovať aj $_POST['password2'] na server-side)
     // TODO: Implement repeat password validation on server side as well.
     // TODO: Sanitize and validate all user inputs.
 
@@ -124,7 +123,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
-        /* Rovnaké CSS ako v login(1).php */
         body {
             background-color: #f4f7f9;
             margin: 0;
@@ -179,12 +177,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <!-- Navigačný bar, rovnaký ako v login(1).php -->
     <nav>
         <div class="navbar-container">
-            <div class="navbar-title">Názov stránky</div>
+            <div class="navbar-title">Registrácia</div>
             <ul class="navbar-links">
                 <li><a href="index.php">Zoznam laureátov</a></li>
             </ul>
         </div>
     </nav>
+
+    <!-- MODAL o cookies -->
+    <div class="modal fade" id="cookiesModal" tabindex="-1" aria-labelledby="cookiesModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cookiesModalLabel">Informácia o cookies</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zavrieť"></button>
+          </div>
+          <div class="modal-body">
+            Táto stránka používa cookies na zabezpečenie plnej funkčnosti a zlepšenie vášho zážitku.
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Rozumiem</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Koniec MODAL -->
 
     <div class="container">
       <div class="row justify-content-center">
@@ -298,12 +315,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <!-- JavaScript validácia Mena, Priezviska, Emailu, prázdnych polí, + zopakovanie hesla -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {
+        // Zobrazíme modal s cookies hneď po načítaní
+        var cookiesModal = new bootstrap.Modal(document.getElementById('cookiesModal'), {
+          keyboard: false
+        });
+        cookiesModal.show();
+
         const regForm       = document.getElementById('regForm');
         const firstName     = document.getElementById('firstname');
         const lastName      = document.getElementById('lastname');
         const emailInput    = document.getElementById('email');
         const passwordInput = document.getElementById('password');
-        const password2Input= document.getElementById('password2'); // Zopakovať heslo
+        const password2Input= document.getElementById('password2'); 
         const jsErrorMsg    = document.getElementById('jsErrorMsg');
 
         // Regex pre meno/priezvisko (len písmená vrátane diakritiky, bez číslic):
@@ -315,7 +338,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const emailRegex = /^[A-Za-z0-9.]{3,}@[a-z]+\.[a-z]+$/;
 
         regForm.addEventListener('submit', function(e) {
-          // Najprv vyresetujeme obsah JS chýb
           jsErrorMsg.style.display = 'none';
           jsErrorMsg.innerHTML = '';
 
@@ -329,19 +351,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
           // 1) Overenie, či polia nie sú prázdne
           if (!fNameVal) {
-            errors.push("Pole 'Meno' nemôže ostať prázdne.");
+            errors.push("Pole Meno nemôže ostať prázdne.");
           }
           if (!lNameVal) {
-            errors.push("Pole 'Priezvisko' nemôže ostať prázdne.");
+            errors.push("Pole Priezvisko nemôže ostať prázdne.");
           }
           if (!emailVal) {
-            errors.push("Pole 'E-mail' nemôže ostať prázdne.");
+            errors.push("Pole E-mail nemôže ostať prázdne.");
           }
           if (!passwordVal) {
-            errors.push("Pole 'Heslo' nemôže ostať prázdne.");
+            errors.push("Pole Heslo nemôže ostať prázdne.");
           }
           if (!password2Val) {
-            errors.push("Pole 'Zopakovať heslo' nemôže ostať prázdne.");
+            errors.push("Pole Zopakovať heslo nemôže ostať prázdne.");
           }
 
           // 2) Ďalšie validácie Meno/Priezvisko (len písmená + max 50 znakov)
@@ -363,7 +385,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             errors.push("Nesprávny formát emailu. Pred @ aspoň 3 znaky (A-Z, 0-9, .), po @ len malé písmená + . + malé písmená.");
           }
 
-          // 4) Kontrola zhody hesiel (ak obidve nie sú prázdne)
+          // 4) Kontrola zhody hesiel
           if (passwordVal && password2Val && (passwordVal !== password2Val)) {
             errors.push("Zadané heslá sa nezhodujú.");
           }
