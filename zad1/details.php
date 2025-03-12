@@ -214,9 +214,9 @@ foreach ($results as $row) {
     <div class="navbar-container">
         <div class="navbar-title">Nobelove stránky</div>
         <ul class="navbar-links">
-            <li><a href="#">Laureáti</a></li>
-            <li><a href="#">Prihlásenie</a></li>
-            <li><a href="#">Registrácia</a></li>
+            <li><a href="index.php">Zoznam laureátov</a></li>
+            <li><a href="login.php">Prihlásenie</a></li>
+            <li><a href="register.php">Registrácia</a></li>
         </ul>
     </div>
 </nav>

@@ -73,16 +73,16 @@ if (isset($_GET['code'])) {
     // 5) Uložíme používateľa do DB (iba fullname, email).
     //    password a 2fa_code necháme prázdne reťazce, aby nevyhodilo chybu pri NOT NULL stĺpcoch.
     try {
-        // Overíme, či už existuje používateľ s týmto e-mailom
+        
         $checkSql = "SELECT id FROM users WHERE email = :email LIMIT 1";
         $checkStmt = $pdo->prepare($checkSql);
         $checkStmt->bindValue(":email", $googleEmail);
         $checkStmt->execute();
 
-        $userId = null; // Premenná, kam si uložíme ID používateľa
+        $userId = null; 
 
         if ($checkStmt->rowCount() === 0) {
-            // Používateľ ešte neexistuje -> vložíme
+            
             $insertSql = "
                 INSERT INTO users (fullname, email, password, 2fa_code)
                 VALUES (:fullname, :email, '', '')
@@ -92,18 +92,16 @@ if (isset($_GET['code'])) {
             $insertStmt->bindValue(":email", $googleEmail);
             $insertStmt->execute();
 
-            // Získame id nového záznamu
+            
             $userId = $pdo->lastInsertId();
         } else {
-            // Používateľ už existuje -> získame jeho ID
+            
             $row = $checkStmt->fetch();
             $userId = $row['id'];
-            // Prípadne môžeš updatnúť meno, ak chceš
-            // ...
+           
         }
 
-        // 6) Vložíme záznam do users_login (user_id, login_type = 'google', email, fullname)
-        //    Tým vieme, že používateľ sa prihlásil cez Google a kedy (login_time = default timestamp)
+        
         if (!empty($userId)) {
             $insertLoginSql = "
                 INSERT INTO users_login (user_id, login_type, email, fullname)
@@ -117,11 +115,11 @@ if (isset($_GET['code'])) {
             $stmtLogin->execute();
         }
 
-        // Môžeš si uložiť do session aj meno a email
+        
         $_SESSION['fullname'] = $googleFullName;
         $_SESSION['email']    = $googleEmail;
 
-        // 7) Presmerovanie na restricted.php
+        
         $redirect_uri = "https://node73.webte.fei.stuba.sk/zad1/restricted.php";
         header('Location: ' . filter_var($redirect_uri, FILTER_SANITIZE_URL));
         exit;

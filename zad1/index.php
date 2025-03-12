@@ -175,7 +175,7 @@ sort($categories);
         <ul class="navbar-links">
             <li><a href="index.php">Laureáti</a></li>
             <li><a href="login.php">Prihlásenie</a></li>
-            <li><a href="#">Registrácia</a></li>
+            <li><a href="register.php">Registrácia</a></li>
         </ul>
     </div>
 </nav>
