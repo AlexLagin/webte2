@@ -86,7 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['changePW'])) {
             $stmtUpdate->bindValue(':email', $_SESSION['email'], PDO::PARAM_STR);
 
             if ($stmtUpdate->execute()) {
-                $msgChange = "Heslo bolo úspešne zmenené.";
+                // Presmerovanie na restricted.php po úspešnej zmene hesla
+                header("Location: restricted.php?pw=changed");
+                exit;
             } else {
                 $msgChange = "Nepodarilo sa zmeniť heslo.";
             }

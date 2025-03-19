@@ -168,7 +168,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 unset($pdo);
 ?>
-
 <!doctype html>
 <html lang="sk">
 <head>
@@ -337,14 +336,17 @@ unset($pdo);
     <!-- Načítanie Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- JavaScript: zobrazenie modalu cookies, AJAX kontrola používateľa, overenie emailu a hesla, zabránenie skorému submitu -->
+    <!-- JavaScript: zobrazenie modalu cookies (iba raz počas aktuálnej relácie pomocou sessionStorage), AJAX kontrola používateľa, overenie emailu a hesla, zabránenie skorému submitu -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        // Zobrazíme modal s cookies hneď po načítaní
-        var cookiesModal = new bootstrap.Modal(document.getElementById('cookiesModal'), {
-          keyboard: false
-        });
-        cookiesModal.show();
+        // Zobrazíme modal s cookies iba ak ešte nebol zobrazený počas aktuálnej relácie prehliadača
+        if (!sessionStorage.getItem('cookiesShown')) {
+            var cookiesModal = new bootstrap.Modal(document.getElementById('cookiesModal'), {
+                keyboard: false
+            });
+            cookiesModal.show();
+            sessionStorage.setItem('cookiesShown', 'true');
+        }
 
         const loginForm      = document.getElementById('loginForm');
         const emailInput     = document.getElementById('email');
@@ -379,7 +381,7 @@ unset($pdo);
                   userCheckMsg.textContent = '';
                 } else {
                   userCheckMsg.style.color = 'red';
-                  userCheckMsg.textContent = 'Tento používateľ neexistuje.';
+                  userCheckMsg.textContent = '';
                 }
               } else {
                 userCheckMsg.style.color = 'red';

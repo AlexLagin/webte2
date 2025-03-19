@@ -119,7 +119,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Registrácia</title>
-    <!-- Načítanie Bootstrap CSS (rovnako ako v login(1).php) -->
+    <!-- Načítanie Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
@@ -174,7 +174,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 
 <body>
-    <!-- Navigačný bar, rovnaký ako v login(1).php -->
+    <!-- Navigačný bar -->
     <nav>
         <div class="navbar-container">
             <div class="navbar-title">Registrácia</div>
@@ -309,17 +309,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
       </div>
     </div>
 
-    <!-- Načítanie Bootstrap JS (rovnako ako v login(1).php) -->
+    <!-- Načítanie Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- JavaScript validácia Mena, Priezviska, Emailu, prázdnych polí, + zopakovanie hesla -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        // Zobrazíme modal s cookies hneď po načítaní
-        var cookiesModal = new bootstrap.Modal(document.getElementById('cookiesModal'), {
-          keyboard: false
-        });
-        cookiesModal.show();
+        // Zobrazíme modal s cookies iba ak ešte nebol zobrazený počas aktuálnej relácie prehliadača
+        if (!sessionStorage.getItem('cookiesShown')) {
+            var cookiesModal = new bootstrap.Modal(document.getElementById('cookiesModal'), {
+              keyboard: false
+            });
+            cookiesModal.show();
+            sessionStorage.setItem('cookiesShown', 'true');
+        }
 
         const regForm       = document.getElementById('regForm');
         const firstName     = document.getElementById('firstname');

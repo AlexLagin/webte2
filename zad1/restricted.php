@@ -113,10 +113,6 @@ if (!empty($_SESSION['email'])) {
     $stmtLog->execute();
     $loginHistory = $stmtLog->fetchAll(PDO::FETCH_ASSOC);
 }
-
-// TODO: Možnosť dočasne vypnúť alebo resetovať 2FA
-// TODO: Možnosť resetovať heslo
-
 ?>
 <!doctype html>
 <html lang="sk">
@@ -201,6 +197,11 @@ if (!empty($_SESSION['email'])) {
                   <h3>Obsah dostupný len po prihlásení</h3>
               </div>
               <div class="card-body">
+
+                  <!-- Ak bol heslo úspešne zmenené, zobrazíme hlásenie -->
+                  <?php if (isset($_GET['pw']) && $_GET['pw'] === 'changed'): ?>
+                      <div class="alert alert-success">Heslo bolo úspešne zmenené.</div>
+                  <?php endif; ?>
 
                   <!-- Zobrazenie mena z DB (prípadne fallback) -->
                   <?php if (!empty($userFullname)): ?>
