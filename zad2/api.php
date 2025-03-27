@@ -103,7 +103,7 @@ switch ($method) {
     case 'PUT':
         if ($route[0] == 'laureates' && count($route) == 2 && is_numeric($route[1])) {
             $currentID = $route[1];
-            $currentData = $laureate->show($currentID);
+            /*$currentData = $laureate->show($currentID);*/
             if (!$currentData) {
                 http_response_code(404);
                 echo json_encode(['message' => 'Not found']);
