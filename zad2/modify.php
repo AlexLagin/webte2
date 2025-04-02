@@ -42,10 +42,6 @@
     .message.error {
       background-color: #f8d7da;
     }
-    /* Skryté polia pre literatúru */
-    .lit-fields {
-      display: none;
-    }
   </style>
 </head>
 <body>
@@ -91,15 +87,6 @@
               <div class="form-text">Nechajte prázdne, ak je stále nažive.</div>
             </div>
 
-            <!-- Sekcia pre Nobelove ceny -->
-            <div id="prizes-section" class="mt-4">
-              <!-- Dynamicky vložené polia pre každú cenu budú mať štruktúru: 
-                   prizes[index][id] (hidden), prizes[index][year], prizes[index][category], 
-                   prizes[index][contrib_sk], prizes[index][contrib_en],
-                   a ak kategória == "literatúra": prizes[index][language_sk], prizes[index][language_en],
-                   prizes[index][genre_sk], prizes[index][genre_en] -->
-            </div>
-
             <!-- Tlačidlo Uložiť zmeny (zarovnané na stred) -->
             <div class="text-center mt-4">
               <button type="submit" class="btn btn-outline-primary btn-sm">Uložiť zmeny</button>
@@ -123,43 +110,46 @@
 
     const laureateId = getQueryParam('id');
     const laureateMessageDiv = document.getElementById('laureateMessage');
-    const prizesSection = document.getElementById('prizes-section');
     const bigForm = document.getElementById('bigForm');
 
-    // Aktualizácia viditeľnosti pre "Celé meno", "Organizáciu" a "Pohlavie"
-    function updateNameOrgVisibility() {
-      const fullname = document.getElementById('fullname').value.trim();
-      const organisation = document.getElementById('organisation').value.trim();
-      
-      if (fullname !== '') {
-        // Ak je vyplnené "Celé meno", zobrazíme "Celé meno" aj "Pohlavie" a skryjeme "Organizáciu"
+    // Premenná pre určenie typu záznamu: 'person', 'organisation' alebo 'both'
+    let recordType = 'both';
+
+    // Upravená funkcia pre nastavenie viditeľnosti, ktorá už nepodlieha zmenám od používateľa
+    function applyRecordType() {
+      if (recordType === 'person') {
         document.getElementById('fullname-container').style.display = 'block';
         document.getElementById('organisation-container').style.display = 'none';
         document.getElementById('gender-container').style.display = 'block';
-      } else if (organisation !== '') {
-        // Ak je vyplnená "Organizácia", zobrazíme len "Organizáciu" a skryjeme "Celé meno" a "Pohlavie"
+      } else if (recordType === 'organisation') {
         document.getElementById('fullname-container').style.display = 'none';
         document.getElementById('organisation-container').style.display = 'block';
         document.getElementById('gender-container').style.display = 'none';
       } else {
-        // Ak sú obe prázdne, zobrazíme obe a aj "Pohlavie"
-        document.getElementById('fullname-container').style.display = 'block';
-        document.getElementById('organisation-container').style.display = 'block';
-        document.getElementById('gender-container').style.display = 'block';
+        // Ak recordType je 'both', dynamické správanie – ak používateľ zadá niečo do jedného z polí, príslušné pole sa ukáže/skryje
+        const fullname = document.getElementById('fullname').value;
+        const organisation = document.getElementById('organisation').value;
+        
+        if (fullname && fullname.trim() !== "") {
+          document.getElementById('fullname-container').style.display = 'block';
+          document.getElementById('organisation-container').style.display = 'none';
+          document.getElementById('gender-container').style.display = 'block';
+        } else if (organisation && organisation.trim() !== "") {
+          document.getElementById('fullname-container').style.display = 'none';
+          document.getElementById('organisation-container').style.display = 'block';
+          document.getElementById('gender-container').style.display = 'none';
+        } else {
+          document.getElementById('fullname-container').style.display = 'block';
+          document.getElementById('organisation-container').style.display = 'block';
+          document.getElementById('gender-container').style.display = 'block';
+        }
       }
     }
 
-    // Automatické prispôsobenie výšky pre <textarea>
-    function autoResizeTextarea(el) {
-      el.style.height = 'auto';
-      el.style.height = el.scrollHeight + 'px';
-    }
-
-    // Ak nebolo zadané ID, zobraz chybu
+    // Načítanie údajov o laureátovi a nastavenie režimu (recordType)
     if (!laureateId) {
       laureateMessageDiv.innerHTML = '<div class="message error">Nebolo zadané ID laureáta.</div>';
     } else {
-      // Načítanie údajov o laureátovi a predvyplnenie formulára
       fetch(`/zad2/api/v0/laureates/${laureateId}`)
         .then(response => {
           if (!response.ok) {
@@ -168,169 +158,62 @@
           return response.json();
         })
         .then(data => {
-          if (data.organisation && data.organisation.trim() !== '') {
+          // Určíme recordType podľa načítaných údajov:
+          // Ak je fullname neprázdne, ide o osobu; ak je prázdne a organizácia nie, ide o organizáciu;
+          // inak ponecháme 'both'.
+          if (data.fullname && data.fullname.trim() !== "") {
+            recordType = 'person';
+            document.getElementById('fullname').value = data.fullname || '';
+          } else if (data.organisation && data.organisation.trim() !== "") {
+            recordType = 'organisation';
             document.getElementById('organisation').value = data.organisation;
           } else {
+            recordType = 'both';
             document.getElementById('fullname').value = data.fullname || '';
+            document.getElementById('organisation').value = data.organisation || '';
           }
+          // Naplnenie ostatných polí
           document.getElementById('gender').value = data.sex || '';
           document.getElementById('birth_year').value = data.birth_year || '';
           document.getElementById('death_year').value = data.death_year || '';
-          updateNameOrgVisibility();
-        })
-        .catch(error => {
-          laureateMessageDiv.innerHTML = `<div class="message error">${error.message}</div>`;
-        });
-
-      // Načítanie Nobelových cien a vytvorenie polí pre každú cenu
-      fetch(`/zad2/api/v0/laureates/${laureateId}/prizes`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Chyba pri načítaní informácií o cene.');
-          }
-          return response.json();
-        })
-        .then(prizes => {
-          if (!Array.isArray(prizes) || prizes.length === 0) {
-            prizesSection.innerHTML = `<p>Tento laureát nezískal žiadnu cenu.</p>`;
-          } else {
-            prizes.forEach((prize, index) => {
-              const container = document.createElement('div');
-              container.classList.add('mb-4');
-
-              const isLiterature = (prize.category || '').trim().toLowerCase() === 'literatúra';
-
-              container.innerHTML = `
-                <input type="hidden" name="prizes[${index}][id]" value="${prize.id}">
-                <div class="mb-3">
-                  <label class="form-label">Rok</label>
-                  <input type="number" class="form-control" name="prizes[${index}][year]" value="${prize.year || ''}">
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Kategória</label>
-                  <input type="text" class="form-control prize-category" name="prizes[${index}][category]" value="${prize.category || ''}">
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Ocenenie (SK)</label>
-                  <textarea class="form-control auto-resize" name="prizes[${index}][contrib_sk]" rows="1">${prize.contrib_sk || ''}</textarea>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Ocenenie (EN)</label>
-                  <textarea class="form-control auto-resize" name="prizes[${index}][contrib_en]" rows="1">${prize.contrib_en || ''}</textarea>
-                </div>
-                <div class="lit-fields" id="lit-fields-${index}" style="display: ${isLiterature ? 'block' : 'none'};">
-                  <div class="mb-3">
-                    <label class="form-label">Jazyk (SK)</label>
-                    <textarea class="form-control auto-resize" name="prizes[${index}][language_sk]" rows="1">${prize.language_sk || ''}</textarea>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Jazyk (EN)</label>
-                    <textarea class="form-control auto-resize" name="prizes[${index}][language_en]" rows="1">${prize.language_en || ''}</textarea>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Žáner (SK)</label>
-                    <textarea class="form-control auto-resize" name="prizes[${index}][genre_sk]" rows="1">${prize.genre_sk || ''}</textarea>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">Žáner (EN)</label>
-                    <textarea class="form-control auto-resize" name="prizes[${index}][genre_en]" rows="1">${prize.genre_en || ''}</textarea>
-                  </div>
-                </div>
-              `;
-              prizesSection.appendChild(container);
-
-              // Reagovať na zmenu kategórie – ak sa zmení na "literatúra", zobrazí sa lit-fields
-              const categoryInput = container.querySelector('.prize-category');
-              categoryInput.addEventListener('input', () => {
-                const litContainer = document.getElementById(`lit-fields-${index}`);
-                if (categoryInput.value.trim().toLowerCase() === 'literatúra') {
-                  litContainer.style.display = 'block';
-                } else {
-                  litContainer.style.display = 'none';
-                }
-              });
-            });
-
-            // Spusti auto-resize pre všetky <textarea>
-            document.querySelectorAll('textarea.auto-resize').forEach((ta) => {
-              autoResizeTextarea(ta);
-              ta.addEventListener('input', () => autoResizeTextarea(ta));
-            });
-          }
+          // Aplikujeme režim, ktorý uzamkne príslušné polia
+          applyRecordType();
         })
         .catch(error => {
           laureateMessageDiv.innerHTML = `<div class="message error">${error.message}</div>`;
         });
     }
 
-    // Aktualizácia viditeľnosti polí pri zmene "fullname" a "organisation"
-    document.getElementById('fullname').addEventListener('input', updateNameOrgVisibility);
-    document.getElementById('organisation').addEventListener('input', updateNameOrgVisibility);
-
-    // Submit veľkého formulára – odošleme všetko v jednej PUT požiadavke
+    // Submit veľkého formulára – odoslanie PUT požiadavky
     bigForm.addEventListener('submit', function(e) {
       e.preventDefault();
       if (!laureateId) return;
 
-      // Front-end validácia: ak je viditeľné pole pre "Celé meno" alebo "Organizácia", musíme mať vyplnené aspoň jedno
-      laureateMessageDiv.innerHTML = ''; // vyčistiť staré správy
-      const fullVal = document.getElementById('fullname').value.trim();
-      const orgVal = document.getElementById('organisation').value.trim();
-
-      if (document.getElementById('fullname-container').style.display !== 'none' && !fullVal) {
-        laureateMessageDiv.innerHTML = `<div class="message error">Meno musí byť zadané</div>`;
-        return;
-      }
-      if (document.getElementById('organisation-container').style.display !== 'none' && !orgVal) {
-        laureateMessageDiv.innerHTML = `<div class="message error">Meno musí byť zadané</div>`;
-        return;
-      }
+      // Vyčistenie starých správ
+      laureateMessageDiv.innerHTML = '';
 
       // Zostavenie payloadu
       const formData = new FormData(bigForm);
       const payload = {
-        birth: parseInt(formData.get('birth_year')) || null,
-        death: parseInt(formData.get('death_year')) || null,
-        prizes: []
+        // Kľúče podľa očakávania servera:
+        birth_year: parseInt(formData.get('birth_year')) || null,
+        death_year: parseInt(formData.get('death_year')) || null
       };
 
-      if (document.getElementById('fullname-container').style.display !== 'none') {
+      // Podľa recordType nastavíme buď meno, alebo organizáciu
+      if (recordType === 'person') {
         payload.fullname = formData.get('fullname');
-        payload.gender = formData.get('gender') || null;
-      }
-      if (document.getElementById('organisation-container').style.display !== 'none') {
+        payload.sex = formData.get('gender') || null;
+      } else if (recordType === 'organisation') {
+        payload.organisation = formData.get('organisation');
+      } else {
+        // V prípade 'both'
+        payload.fullname = formData.get('fullname');
+        payload.sex = formData.get('gender') || null;
         payload.organisation = formData.get('organisation');
       }
 
-      // Spracovanie údajov o cenách
-      const prizesMap = {};
-      for (let [key, value] of formData.entries()) {
-        const match = key.match(/^prizes\[(\d+)\]\[(.+)\]$/);
-        if (match) {
-          const index = match[1];
-          const field = match[2];
-          if (!prizesMap[index]) {
-            prizesMap[index] = {};
-          }
-          prizesMap[index][field] = value;
-        }
-      }
-      Object.keys(prizesMap).forEach(index => {
-        const p = prizesMap[index];
-        payload.prizes.push({
-          id: parseInt(p.id),
-          year: p.year ? parseInt(p.year) : null,
-          category: p.category || null,
-          contrib_sk: p.contrib_sk || null,
-          contrib_en: p.contrib_en || null,
-          language_sk: p.language_sk || null,
-          language_en: p.language_en || null,
-          genre_sk: p.genre_sk || null,
-          genre_en: p.genre_en || null
-        });
-      });
-
-      // Odošleme PUT požiadavku
+      // Odošleme PUT požiadavku na server
       fetch(`/zad2/api/v0/laureates/${laureateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

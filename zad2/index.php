@@ -63,12 +63,49 @@
     <div class="card shadow">
       <div class="card-body p-4">
         <h1 class="mb-4">Laureates</h1>
+
+        <!-- Riadok s filtermi a tlačidlom Add Laureate -->
+        <div class="row align-items-center mb-3">
+          <div class="col-md-9">
+            <div class="row g-3 align-items-center">
+              <div class="col-auto">
+                <label for="filterYear" class="col-form-label">Rok:</label>
+              </div>
+              <div class="col-auto">
+                <select id="filterYear" class="form-select form-select-sm">
+                  <option value="">Všetky</option>
+                </select>
+              </div>
+              <div class="col-auto">
+                <label for="filterCategory" class="col-form-label">Kategória:</label>
+              </div>
+              <div class="col-auto">
+                <select id="filterCategory" class="form-select form-select-sm">
+                  <option value="">Všetky</option>
+                </select>
+              </div>
+              <div class="col-auto">
+                <label for="filterCountry" class="col-form-label">Krajina:</label>
+              </div>
+              <div class="col-auto">
+                <input type="text" id="filterCountry" class="form-control form-control-sm" placeholder="Hľadať krajinu">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3 text-end">
+            <a href="addLaureate.php" class="btn btn-outline-primary btn-sm">Add Laureate</a>
+          </div>
+        </div>
+
         <!-- Tabuľka -->
         <div class="table-responsive">
           <table class="table table-striped mb-0">
             <thead class="table-light">
               <tr>
                 <th>Full Name</th>
+                <th>Year</th>
+                <th>Category</th>
+                <th>Krajina</th>
                 <th>Gender</th>
                 <th>Birth Year</th>
                 <th>Death Year</th>
@@ -80,6 +117,7 @@
             </tbody>
           </table>
         </div>
+
         <!-- Spodný panel (footer) so stránkovaním -->
         <div class="mt-3">
           <div class="row align-items-center">
@@ -127,10 +165,62 @@
     </div>
   </div>
 
+  <!-- Modal pre potvrdenie vymazania -->
+  <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteModalLabel">Potvrdenie vymazania</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Skutočne chcete vymazať tohto laureáta?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Zrušiť</button>
+          <button type="button" id="confirmDeleteBtn" class="btn btn-danger btn-sm">Vymazať</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap 5 JS (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+    // Funkcia pre načítanie filter možností z API
+    async function fetchFilterOptions() {
+      try {
+        // Načítame distinct roky
+        const yearsResponse = await fetch('/zad2/api/v0/prizes/years');
+        if (!yearsResponse.ok) throw new Error('Chyba pri načítaní rokov');
+        const years = await yearsResponse.json();
+        const filterYear = document.getElementById('filterYear');
+        filterYear.innerHTML = '<option value="">Všetky</option>';
+        years.forEach(year => {
+          const option = document.createElement('option');
+          option.value = year;
+          option.textContent = year;
+          filterYear.appendChild(option);
+        });
+
+        // Načítame distinct kategórie
+        const catResponse = await fetch('/zad2/api/v0/prizes/categories');
+        if (!catResponse.ok) throw new Error('Chyba pri načítaní kategórií');
+        const categories = await catResponse.json();
+        const filterCategory = document.getElementById('filterCategory');
+        filterCategory.innerHTML = '<option value="">Všetky</option>';
+        categories.forEach(category => {
+          const option = document.createElement('option');
+          option.value = category;
+          option.textContent = category;
+          filterCategory.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error fetching filter options:', error);
+      }
+    }
+
     // Premenné pre stránkovanie
     let currentPage = 1;
     let limit = 10;
@@ -145,9 +235,25 @@
     const nextPageBtn = document.getElementById('nextPageBtn');
     const pageSelect = document.getElementById('pageSelect');
 
+    // Premenná pre ID laureáta, ktorý chceme vymazať
+    let deleteLaureateId = null;
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+    // Funkcia pre načítanie a zobrazenie laureátov s filtrom
     async function fetchAndDisplayLaureates(page = 1, limit = 10) {
       try {
-        const response = await fetch(`/zad2/api/v0/laureates?page=${page}&limit=${limit}`);
+        // Získame aktuálne hodnoty z filtrov
+        const filterYear = document.getElementById('filterYear').value;
+        const filterCategory = document.getElementById('filterCategory').value;
+        const filterCountry = document.getElementById('filterCountry').value;
+
+        // Zostavíme query string s parametrami
+        let query = `?page=${page}&limit=${limit}`;
+        if (filterYear) query += `&year=${encodeURIComponent(filterYear)}`;
+        if (filterCategory) query += `&category=${encodeURIComponent(filterCategory)}`;
+        if (filterCountry) query += `&country=${encodeURIComponent(filterCountry)}`;
+
+        const response = await fetch(`/zad2/api/v0/laureates${query}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -174,6 +280,21 @@
           });
           nameCell.appendChild(nameLink);
           row.appendChild(nameCell);
+
+          // Nový stĺpec: Year
+          const yearCell = document.createElement('td');
+          yearCell.textContent = laureate.year || 'N/A';
+          row.appendChild(yearCell);
+
+          // Nový stĺpec: Category
+          const categoryCell = document.createElement('td');
+          categoryCell.textContent = laureate.category || 'N/A';
+          row.appendChild(categoryCell);
+
+          // Nový stĺpec: Krajina
+          const countryCell = document.createElement('td');
+          countryCell.textContent = laureate.country || 'N/A';
+          row.appendChild(countryCell);
 
           // Gender
           const sexCell = document.createElement('td');
@@ -206,7 +327,6 @@
           `;
           row.appendChild(actionsCell);
 
-          // Po kliknutí na "Upraviť" presmerujeme na modify.php s parametrom id
           const editLink = actionsCell.querySelector('.edit-link');
           editLink.addEventListener('click', () => {
             window.location.href = `modify.php?id=${laureate.id}`;
@@ -214,18 +334,18 @@
 
           const deleteLink = actionsCell.querySelector('.delete-link');
           deleteLink.addEventListener('click', () => {
-            console.log(`Vymazať ID = ${laureate.id}`);
+            // Nastavíme aktuálne ID a zobrazíme modal pre potvrdenie vymazania
+            deleteLaureateId = laureate.id;
+            deleteModal.show();
           });
 
           tableBody.appendChild(row);
         });
 
-        // Aktualizácia info o rozsahu
         const startIndex = (currentPage - 1) * limit + 1;
         const endIndex = startIndex + result.data.length - 1;
         paginationInfo.textContent = `${startIndex}-${endIndex} of ${total}`;
 
-        // Naplnenie comboboxu pre výber stránky
         pageSelect.innerHTML = '';
         for (let p = 1; p <= lastPage; p++) {
           const option = document.createElement('option');
@@ -243,7 +363,21 @@
       }
     }
 
-    // Po zmene počtu riadkov na stránku
+    // Pridáme event listenery na zmenu filtrov
+    document.getElementById('filterYear').addEventListener('change', () => {
+      currentPage = 1;
+      fetchAndDisplayLaureates(currentPage, limit);
+    });
+    document.getElementById('filterCategory').addEventListener('change', () => {
+      currentPage = 1;
+      fetchAndDisplayLaureates(currentPage, limit);
+    });
+    document.getElementById('filterCountry').addEventListener('input', () => {
+      currentPage = 1;
+      fetchAndDisplayLaureates(currentPage, limit);
+    });
+
+    // Event listener pre zmenu počtu riadkov
     rowsPerPageSelect.addEventListener('change', () => {
       limit = parseInt(rowsPerPageSelect.value, 10);
       currentPage = 1;
@@ -264,7 +398,6 @@
       }
     });
 
-    // Event listener pre combobox pre výber stránky
     pageSelect.addEventListener('change', () => {
       const selectedPage = parseInt(pageSelect.value, 10);
       if (!isNaN(selectedPage) && selectedPage >= 1 && selectedPage <= lastPage) {
@@ -321,6 +454,36 @@
       }
     }
 
+    // Funkcia pre odoslanie DELETE požiadavky
+    async function deleteLaureate(id) {
+      try {
+        const response = await fetch(`/zad2/api/v0/laureates/${id}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const result = await response.json();
+        console.log(result.message);
+        // Obnovíme tabuľku po vymazaní
+        fetchAndDisplayLaureates(currentPage, limit);
+      } catch (error) {
+        console.error('Error deleting laureate:', error);
+      }
+    }
+
+    // Pridáme event listener pre tlačidlo potvrdenia vymazania
+    document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+      if (deleteLaureateId !== null) {
+        deleteLaureate(deleteLaureateId);
+        // Skryjeme modal
+        deleteModal.hide();
+      }
+    });
+
+    // Načítanie filter možností
+    fetchFilterOptions();
+    // Načítanie a zobrazenie laureátov so zvolenými filtrami
     fetchAndDisplayLaureates(currentPage, limit);
   </script>
 </body>
