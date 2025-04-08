@@ -70,47 +70,188 @@ switch ($method) {
 
     case 'POST':
         if ($route[0] == 'laureates' && count($route) == 1) {
-            $data = json_decode(file_get_contents('php://input'), true);
-            foreach ($data as $key => $value) {
-                if (!isset($data[$key]) || $data[$key] == '') {
-                    $data[$key] = null;
+            // Ak URL obsahuje "addMore.php", predpokladáme, že ide o viaceré záznamy
+            if (strpos($_SERVER['REQUEST_URI'], 'addMore.php') !== false) {
+                try {
+                    $pdo->beginTransaction();
+                    $data = json_decode(file_get_contents('php://input'), true);
+                    if ($data === null) {
+                        throw new Exception('Invalid JSON data');
+                    }
+                    // Očakávame, že data obsahuje pole 'laureates'
+                    if (!isset($data['laureates']) || !is_array($data['laureates'])) {
+                        throw new Exception("Invalid data: 'laureates' must be an array");
+                    }
+                    // Tu môžeme pridať validáciu pre viacerých laureátov (neskôr)
+                    
+                    $insertedIDs = $laureate->storeMultiple($data['laureates']);
+                    $pdo->commit();
+                    http_response_code(201);
+                    echo json_encode([
+                        'message' => "Multiple laureates created successfully",
+                        'data' => $insertedIDs
+                    ]);
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    http_response_code(400);
+                    echo json_encode(['message' => $e->getMessage()]);
                 }
-            }
-            $newID = $laureate->store(
-                $data['gender'],
-                $data['birth'],
-                $data['death'],
-                $data['fullname'],
-                $data['organisation']
-            );
-            if (!is_numeric($newID)) {
-                http_response_code(400);
-                echo json_encode(['message' => "Bad request", 'data' => $newID]);
+                break;
+            } else {
+                // Existujúca logika pre jediného laureáta
+                try {
+                    $pdo->beginTransaction();
+                    $data = json_decode(file_get_contents('php://input'), true);
+                    if ($data === null) {
+                        throw new Exception('Invalid JSON data');
+                    }
+                    // Nahradíme prázdne reťazce hodnotou null
+                    foreach ($data as $key => $value) {
+                        if (!isset($data[$key]) || $data[$key] === '') {
+                            $data[$key] = null;
+                        }
+                    }
+                    /* Validácia laureáta:
+                       - Vyplňte buď "fullname" alebo "organisation", nie oboje, aspoň jedno musí byť vyplnené.
+                       - Ak je vyplnené "fullname", overí sa jeho dĺžka (max 255) a "birth" (rok narodenia) musí byť zadaný, číselný, ≤ 9999.
+                       - Ak je zadaná "organisation", nastaví sa "fullname" na null.
+                    */
+                    if ((isset($data['fullname']) && trim($data['fullname']) !== '') &&
+                        (isset($data['organisation']) && trim($data['organisation']) !== '')) {
+                        throw new Exception("Vyplňte buď meno, alebo organizáciu, nie oboje");
+                    }
+                    if ((!isset($data['fullname']) || trim($data['fullname']) === '') &&
+                        (!isset($data['organisation']) || trim($data['organisation']) === '')) {
+                        throw new Exception("Musíte zadať meno alebo organizáciu");
+                    }
+                    if (isset($data['fullname']) && trim($data['fullname']) !== '') {
+                        if (strlen(trim($data['fullname'])) > 255) {
+                            throw new Exception("Meno nesmie byť dlhšie ako 255 znakov");
+                        }
+                        if (!isset($data['birth']) || trim($data['birth']) === '') {
+                            throw new Exception("Rok narodenia nesmie byť prázdny");
+                        }
+                        if (!is_numeric($data['birth']) || (int)$data['birth'] > 9999) {
+                            throw new Exception("Rok narodenia musí byť číslo s najviac 4 ciframi");
+                        }
+                        $data['organisation'] = null;
+                    }
+                    if (isset($data['organisation']) && trim($data['organisation']) !== '') {
+                        if (strlen(trim($data['organisation'])) > 255) {
+                            throw new Exception("Organizácia nesmie byť dlhšia ako 255 znakov");
+                        }
+                        $data['birth'] = null;
+                        $data['death'] = null;
+                        $data['fullname'] = null;
+                    }
+                    // Validácia roku úmrtia (ak je zadaný)
+                    if (isset($data['death']) && trim($data['death']) !== '') {
+                        if (!is_numeric($data['death']) || (int)$data['death'] > 9999) {
+                            throw new Exception("Rok úmrtia musí byť číslo s najviac 4 ciframi");
+                        }
+                        if ((int)$data['death'] <= (int)$data['birth']) {
+                            throw new Exception("Rok úmrtia musí byť väčší ako rok narodenia");
+                        }
+                    }
+                    // Validácia cien
+                    if (isset($data['prizes']) && is_array($data['prizes'])) {
+                        foreach ($data['prizes'] as $prize) {
+                            if (!isset($prize['category']) || trim($prize['category']) === '') {
+                                throw new Exception("Kategória ceny musí byť vybratá");
+                            }
+                            if (!isset($prize['year']) || trim($prize['year']) === '') {
+                                throw new Exception("Rok získania ceny nesmie byť prázdny");
+                            }
+                            if (!is_numeric($prize['year'])) {
+                                throw new Exception("Rok získania ceny musí byť číselný");
+                            }
+                            if (isset($data['birth']) && is_numeric($data['birth'])) {
+                                if ((int)$prize['year'] <= (int)$data['birth']) {
+                                    throw new Exception("Rok získania ceny musí byť väčší ako rok narodenia");
+                                }
+                            }
+                            if (!isset($prize['award']) || trim($prize['award']) === '') {
+                                throw new Exception("Ocenenie nesmie byť prázdne");
+                            }
+                            if (strlen(trim($prize['award'])) > 2048) {
+                                throw new Exception("Ocenenie nesmie byť dlhšie ako 2048 znakov");
+                            }
+                        }
+                    }
+                    // Validácia krajiny (voliteľné, ale ak je zadaná, orežeme ju)
+                    if (isset($data['country']) && trim($data['country']) !== '') {
+                        $data['country'] = trim($data['country']);
+                    }
+                    
+                    // Kontrola, či už laureát existuje (podľa fullname alebo organisation)
+                    $newID = null;
+                    if (isset($data['fullname']) && trim($data['fullname']) !== '') {
+                        $stmt = $pdo->prepare("SELECT * FROM laureates WHERE fullname = :fullname");
+                        $stmt->execute([':fullname' => $data['fullname']]);
+                        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if ($existing) {
+                            $newID = $existing['id'];
+                        }
+                    } elseif (isset($data['organisation']) && trim($data['organisation']) !== '') {
+                        $stmt = $pdo->prepare("SELECT * FROM laureates WHERE organisation = :organisation");
+                        $stmt->execute([':organisation' => $data['organisation']]);
+                        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if ($existing) {
+                            $newID = $existing['id'];
+                        }
+                    }
+                    // Ak laureát neexistuje, vytvoríme ho
+                    if ($newID === null) {
+                        $newID = $laureate->store(
+                            $data['gender'],
+                            $data['birth'],
+                            $data['death'],
+                            $data['fullname'],
+                            $data['organisation']
+                        );
+                        if (!is_numeric($newID)) {
+                            throw new Exception("Bad request pri vytváraní laureáta: " . $newID);
+                        }
+                    }
+                    
+                    // Pridanie krajiny (ak je zadaná)
+                    if (isset($data['country']) && trim($data['country']) !== '') {
+                        $res = $laureate->addCountry($newID, $data['country']);
+                        if ($res !== true) {
+                            throw new Exception("Chyba pri prepojení krajiny: " . $res);
+                        }
+                    }
+                    
+                    // Pridanie cien (ak existujú)
+                    if (isset($data['prizes']) && is_array($data['prizes'])) {
+                        foreach ($data['prizes'] as $prize) {
+                            $res = $laureate->addPrize($newID, $prize);
+                            if ($res !== true) {
+                                throw new Exception($res);
+                            }
+                        }
+                    }
+                    
+                    $pdo->commit();
+                    
+                    $new_laureate = $laureate->show($newID);
+                    http_response_code(201);
+                    echo json_encode([
+                        'message' => "Created successfully",
+                        'data' => $new_laureate
+                    ]);
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    http_response_code(400);
+                    echo json_encode(['message' => $e->getMessage()]);
+                }
                 break;
             }
-            // Ak boli poskytnuté aj informácie o cene, vložíme ich
-            if (isset($data['prizes']) && is_array($data['prizes'])) {
-                foreach ($data['prizes'] as $prize) {
-                    $res = $laureate->addPrize($newID, $prize);
-                    if ($res !== true) {
-                        http_response_code(400);
-                        echo json_encode(['message' => $res]);
-                        exit;
-                    }
-                }
-            }
-            $new_laureate = $laureate->show($newID);
-            http_response_code(201);
-            echo json_encode([
-                'message' => "Created successfully",
-                'data' => $new_laureate
-            ]);
-            break;
         }
         http_response_code(400);
         echo json_encode(['message' => 'Bad request']);
         break;
-
+        
     case 'PUT':
         if ($route[0] == 'laureates' && count($route) == 2 && is_numeric($route[1])) {
             $currentID = $route[1];
@@ -122,7 +263,7 @@ switch ($method) {
             }
             $updatedData = json_decode(file_get_contents('php://input'), true);
             $currentData = array_merge($currentData, $updatedData);
-            // Validácia:
+            // Validácia pre PUT:
             if (($currentData['fullname'] === null) || (trim($currentData['fullname']) === "")) {
                 if (!isset($currentData['organisation']) || trim($currentData['organisation']) === "") {
                     http_response_code(400);
@@ -138,6 +279,23 @@ switch ($method) {
                 if (!isset($currentData['birth_year']) || trim($currentData['birth_year'] . "") === "") {
                     http_response_code(400);
                     echo json_encode(['message' => "Rok narodenia nesmie byť prázdny"]);
+                    break;
+                }
+                if (!is_numeric($currentData['birth_year']) || (int)$currentData['birth_year'] > 9999) {
+                    http_response_code(400);
+                    echo json_encode(['message' => "Rok narodenia musí byť číslo s najviac 4 ciframi"]);
+                    break;
+                }
+            }
+            if (isset($currentData['death_year']) && trim($currentData['death_year'] . "") !== "") {
+                if (!is_numeric($currentData['death_year']) || (int)$currentData['death_year'] > 9999) {
+                    http_response_code(400);
+                    echo json_encode(['message' => "Rok úmrtia musí byť číslo s najviac 4 ciframi"]);
+                    break;
+                }
+                if ((int)$currentData['death_year'] <= (int)$currentData['birth_year']) {
+                    http_response_code(400);
+                    echo json_encode(['message' => "Rok úmrtia musí byť väčší ako rok narodenia"]);
                     break;
                 }
             }

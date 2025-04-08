@@ -160,8 +160,6 @@ class Laureate {
     // Odstránenie laureáta a súvisiacich záznamov
     public function destroy($id) {
         try {
-            $this->db->beginTransaction();
-
             // Odstránenie prepojení s krajinami
             $stmt = $this->db->prepare("DELETE FROM laureate_country WHERE laureate_id = :id");
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
@@ -182,13 +180,11 @@ class Laureate {
             $orphanPrizes = $orphanStmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (!empty($orphanPrizes)) {
-                // Vymažeme orphan ceny
                 $prizeIds = array_column($orphanPrizes, 'id');
                 $placeholders = implode(',', array_fill(0, count($prizeIds), '?'));
                 $stmt = $this->db->prepare("DELETE FROM prizes WHERE id IN ($placeholders)");
                 $stmt->execute($prizeIds);
 
-                // Vymažeme súvisiace prize_details, ak existujú
                 foreach ($orphanPrizes as $prize) {
                     if ($prize['details_id']) {
                         $stmt = $this->db->prepare("DELETE FROM prize_details WHERE id = ?");
@@ -196,10 +192,7 @@ class Laureate {
                     }
                 }
             }
-            
-            $this->db->commit();
         } catch (PDOException $e) {
-            $this->db->rollBack();
             return "Error: " . $e->getMessage();
         }
         return 0;
@@ -207,7 +200,6 @@ class Laureate {
 
     // Pridanie ceny pre daného laureáta
     public function addPrize($laureateID, $prize) {
-        $this->db->beginTransaction();
         try {
             $details_id = null;
             // Ak je kategória Literatúra, vlož do prize_details
@@ -219,7 +211,7 @@ class Laureate {
                 ]);
                 $details_id = $this->db->lastInsertId();
             }
-            // Vloženie do tabuľky prizes – použijeme hodnotu z "award" (ktorá sa uloží do oboch stĺpcov contrib_sk a contrib_en)
+            // Vloženie do tabuľky prizes
             $stmt = $this->db->prepare("INSERT INTO prizes (year, category, contrib_sk, contrib_en, details_id) VALUES (:year, :category, :contrib_sk, :contrib_en, :details_id)");
             $award = isset($prize['award']) ? $prize['award'] : null;
             $stmt->execute([
@@ -236,12 +228,45 @@ class Laureate {
                 ':laureate_id' => $laureateID,
                 ':prize_id' => $prize_id,
             ]);
-            $this->db->commit();
             return true;
         } catch (PDOException $e) {
-            $this->db->rollBack();
             return "Error: " . $e->getMessage();
         }
+    }
+
+    // Pridanie krajiny pre daného laureáta
+    public function addCountry($laureateID, $countryName) {
+        $countryName = trim($countryName);
+        if ($countryName === "") {
+            return "Krajina nesmie byť prázdna";
+        }
+        // Skontrolujeme, či už existuje prepojenie laureáta s touto krajinou
+        $stmt = $this->db->prepare("SELECT c.id FROM countries c JOIN laureate_country lc ON c.id = lc.country_id WHERE lc.laureate_id = :laureate_id AND c.country_name = :country");
+        $stmt->execute([':laureate_id' => $laureateID, ':country' => $countryName]);
+        $existingLink = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($existingLink) {
+            return "Laureát s danou krajinou už existuje";
+        }
+        // Skontrolujeme, či krajina už existuje
+        $stmt = $this->db->prepare("SELECT id FROM countries WHERE country_name = :country");
+        $stmt->bindParam(':country', $countryName, PDO::PARAM_STR);
+        $stmt->execute();
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($existing) {
+            $countryID = $existing['id'];
+        } else {
+            // Vložíme novú krajinu
+            $stmt = $this->db->prepare("INSERT INTO countries (country_name) VALUES (:country)");
+            $stmt->bindParam(':country', $countryName, PDO::PARAM_STR);
+            $stmt->execute();
+            $countryID = $this->db->lastInsertId();
+        }
+        // Prepojenie laureáta s krajinou
+        $stmt = $this->db->prepare("INSERT INTO laureate_country (laureate_id, country_id) VALUES (:laureate_id, :country_id)");
+        $stmt->bindParam(':laureate_id', $laureateID, PDO::PARAM_INT);
+        $stmt->bindParam(':country_id', $countryID, PDO::PARAM_INT);
+        $stmt->execute();
+        return true;
     }
 
     // Načítanie cien pre konkrétneho laureáta
@@ -259,5 +284,68 @@ class Laureate {
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Pridanie viacerých laureátov naraz s validáciou
+    public function storeMultiple($laureates) {
+        $insertedIDs = [];
+        foreach ($laureates as $index => $data) {
+            // Trim hodnoty
+            $fullname = isset($data['fullname']) ? trim($data['fullname']) : "";
+            $organisation = isset($data['organisation']) ? trim($data['organisation']) : "";
+            // Overenie, že aspoň jedno pole je zadané
+            if ($fullname === "" && $organisation === "") {
+                return "Error: Laureát č. " . ($index + 1) . " - Musíte zadať buď celé meno alebo organizáciu";
+            }
+            // Ak je zadané celé meno, validujeme jednotlivé polia
+            if ($fullname !== "") {
+                if (strlen($fullname) > 255) {
+                    return "Error: Laureát č. " . ($index + 1) . " - Celé meno nesmie byť dlhšie ako 255 znakov";
+                }
+                if (!isset($data['birth_year']) || trim($data['birth_year']) === "") {
+                    return "Error: Laureát č. " . ($index + 1) . " - Rok narodenia musí byť zadaný";
+                }
+                $birth_year = trim($data['birth_year']);
+                if (!is_numeric($birth_year) || (int)$birth_year > 9999) {
+                    return "Error: Laureát č. " . ($index + 1) . " - Rok narodenia musí byť číslo s najviac 4 ciframi";
+                }
+                if (!isset($data['gender']) || (trim($data['gender']) !== "Muž" && trim($data['gender']) !== "Žena")) {
+                    return "Error: Laureát č. " . ($index + 1) . " - Pohlavie musí byť vybrané ako 'Muž' alebo 'Žena'";
+                }
+                // Ak je zadany rok úmrtia, validujeme ho
+                if (isset($data['death_year']) && trim($data['death_year']) !== "") {
+                    $death_year = trim($data['death_year']);
+                    if (!is_numeric($death_year) || (int)$death_year > 9999) {
+                        return "Error: Laureát č. " . ($index + 1) . " - Rok úmrtia musí byť číslo s najviac 4 ciframi";
+                    }
+                    if ((int)$death_year <= (int)$birth_year) {
+                        return "Error: Laureát č. " . ($index + 1) . " - Rok úmrtia musí byť väčší ako rok narodenia";
+                    }
+                }
+            } else {
+                // Ak je zadaná organizácia, validujeme jej dĺžku
+                if (strlen($organisation) > 255) {
+                    return "Error: Laureát č. " . ($index + 1) . " - Organizácia nesmie byť dlhšia ako 255 znakov";
+                }
+                // Pri organizácii sa predpokladá, že polia pre jednotlivca budú nastavené na NULL
+                $data['birth_year'] = null;
+                $data['death_year'] = null;
+                $data['gender'] = null;
+            }
+            // Vloženie pomocou metódy store()
+            $id = $this->store(
+                isset($data['gender']) ? $data['gender'] : null,
+                isset($data['birth_year']) ? $data['birth_year'] : null,
+                isset($data['death_year']) ? $data['death_year'] : null,
+                $fullname !== "" ? $fullname : null,
+                $organisation !== "" ? $organisation : null
+            );
+            if (!is_numeric($id)) {
+                $insertedIDs[] = null;
+            } else {
+                $insertedIDs[] = $id;
+            }
+        }
+        return $insertedIDs;
     }
 }

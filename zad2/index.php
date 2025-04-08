@@ -55,6 +55,7 @@
   <nav class="navbar navbar-dark bg-secondary">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">Prehľad laureátov</a>
+      <a class="navbar-brand" href="login.php"> Login</a>
     </div>
   </nav>
 
@@ -64,7 +65,7 @@
       <div class="card-body p-4">
         <h1 class="mb-4">Laureates</h1>
 
-        <!-- Riadok s filtermi a tlačidlom Add Laureate -->
+        <!-- Riadok s filtermi a tlačidlami -->
         <div class="row align-items-center mb-3">
           <div class="col-md-9">
             <div class="row g-3 align-items-center">
@@ -93,6 +94,8 @@
             </div>
           </div>
           <div class="col-md-3 text-end">
+            <!-- Nové tlačidlo Add more -->
+
             <a href="addLaureate.php" class="btn btn-outline-primary btn-sm">Add Laureate</a>
           </div>
         </div>
@@ -281,17 +284,17 @@
           nameCell.appendChild(nameLink);
           row.appendChild(nameCell);
 
-          // Nový stĺpec: Year
+          // Rok
           const yearCell = document.createElement('td');
           yearCell.textContent = laureate.year || 'N/A';
           row.appendChild(yearCell);
 
-          // Nový stĺpec: Category
+          // Kategória
           const categoryCell = document.createElement('td');
           categoryCell.textContent = laureate.category || 'N/A';
           row.appendChild(categoryCell);
 
-          // Nový stĺpec: Krajina
+          // Krajina
           const countryCell = document.createElement('td');
           countryCell.textContent = laureate.country || 'N/A';
           row.appendChild(countryCell);
@@ -334,7 +337,6 @@
 
           const deleteLink = actionsCell.querySelector('.delete-link');
           deleteLink.addEventListener('click', () => {
-            // Nastavíme aktuálne ID a zobrazíme modal pre potvrdenie vymazania
             deleteLaureateId = laureate.id;
             deleteModal.show();
           });
@@ -363,7 +365,7 @@
       }
     }
 
-    // Pridáme event listenery na zmenu filtrov
+    // Event listenery pre filtre
     document.getElementById('filterYear').addEventListener('change', () => {
       currentPage = 1;
       fetchAndDisplayLaureates(currentPage, limit);
@@ -454,7 +456,6 @@
       }
     }
 
-    // Funkcia pre odoslanie DELETE požiadavky
     async function deleteLaureate(id) {
       try {
         const response = await fetch(`/zad2/api/v0/laureates/${id}`, {
@@ -465,25 +466,20 @@
         }
         const result = await response.json();
         console.log(result.message);
-        // Obnovíme tabuľku po vymazaní
         fetchAndDisplayLaureates(currentPage, limit);
       } catch (error) {
         console.error('Error deleting laureate:', error);
       }
     }
 
-    // Pridáme event listener pre tlačidlo potvrdenia vymazania
     document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
       if (deleteLaureateId !== null) {
         deleteLaureate(deleteLaureateId);
-        // Skryjeme modal
         deleteModal.hide();
       }
     });
 
-    // Načítanie filter možností
     fetchFilterOptions();
-    // Načítanie a zobrazenie laureátov so zvolenými filtrami
     fetchAndDisplayLaureates(currentPage, limit);
   </script>
 </body>
