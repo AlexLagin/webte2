@@ -1,0 +1,41 @@
+<?php return array(
+    'root' => array(
+        'name' => '__root__',
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '0218c3da3e7515eaa2818f09b1a5eae43b4bde02',
+        'type' => 'library',
+        'install_path' => __DIR__ . '/../../',
+        'aliases' => array(),
+        'dev' => true,
+    ),
+    'versions' => array(
+        '__root__' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '0218c3da3e7515eaa2818f09b1a5eae43b4bde02',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../../',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+        'workerman/coroutine' => array(
+            'pretty_version' => 'v1.1.3',
+            'version' => '1.1.3.0',
+            'reference' => 'df8fc428967d512a74a8a7d80355c1d40228c9fa',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../workerman/coroutine',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+        'workerman/workerman' => array(
+            'pretty_version' => 'v5.1.1',
+            'version' => '5.1.1.0',
+            'reference' => '72cafa19e488896abd2576ea67b3b1af1abf71c0',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../workerman/workerman',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+    ),
+);

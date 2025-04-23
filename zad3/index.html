@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pretekárska Trať</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Inter, sans-serif;
+      background: linear-gradient(90deg, #2c3e50 0%, #4ca1af 100%);
+      color: #fff;
+      overflow: hidden;
+    }
+    .container {
+      position: relative;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 60px 20px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2.2rem;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+    }
+    #timer {
+      font-size: 1.4rem;
+      margin-bottom: 4px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    }
+    #lapsCounter {
+      font-size: 1rem;
+      margin-bottom: 20px;
+      color: #eee;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 80vh;
+      margin-left: calc(-50vw + 50%);
+      background: transparent;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      margin-bottom: 60px;
+    }
+    /* MENU overlay */
+    #menu {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #menu form {
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 8px;
+      color: #333;
+      text-align: left;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    #menu h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 1.8rem;
+      color: #222;
+    }
+    #menu label {
+      display: block;
+      margin: 12px 0 4px;
+      font-weight: 500;
+    }
+    #menu input[type="text"],
+    #menu select {
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    #menu button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      font-size: 1.1rem;
+      background: #4ca1af;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #menu button:hover {
+      background: #3b8a96;
+    }
+    /* HELP Modal */
+    #helpModal {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    #helpModal .content {
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 8px;
+      color: #333;
+      max-width: 500px;
+      text-align: left;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    #helpModal h2 {
+      margin-top: 0;
+      font-size: 1.8rem;
+      color: #222;
+    }
+    #helpModal p {
+      margin: 12px 0;
+      line-height: 1.4;
+    }
+    #helpModal button {
+      margin-top: 20px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      background: #4ca1af;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #helpModal button:hover {
+      background: #3b8a96;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pretekárska Trať</h1>
+    <div id="timer">00:00.00</div>
+    <div id="lapsCounter">0 / 0 kôl</div>
+    <canvas id="trackCanvas"></canvas>
+  </div>
+
+  <!-- START MENU -->
+  <div id="menu">
+    <form id="startForm">
+      <h2>Štart</h2>
+
+      <label for="nameInput">Meno:</label>
+      <input type="text" id="nameInput" placeholder="Zadaj svoje meno" required/>
+
+      <label for="lapsSelect">Počet kôl:</label>
+      <select id="lapsSelect">
+        <option value="1">1 kolo</option>
+        <option value="2">2 kolá</option>
+        <option value="3" selected>3 kolá</option>
+        <option value="4">4 kolá</option>
+      </select>
+
+      <label for="teamSelect">Tím (farba guličky):</label>
+      <select id="teamSelect">
+        <option value="#3498db">Modrá</option>
+        <option value="#2ecc71">Zelená</option>
+        <option value="#e67e22">Oranžová</option>
+        <option value="#e74c3c">Červená</option>
+      </select>
+
+      <button type="submit">Štartovať</button>
+      <button type="button" id="helpButton">Nápoveda</button>
+    </form>
+  </div>
+
+  <!-- HELP MODAL -->
+  <div id="helpModal">
+    <div class="content">
+      <h2>Návod na hru</h2>
+      <p>Use šípky na pohyb guličky:</p>
+      <ul>
+        <li><strong>⬅️</strong> – pohyb doľava</li>
+        <li><strong>➡️</strong> – pohyb doprava</li>
+        <li><strong>⬆️</strong> – pohyb hore</li>
+        <li><strong>⬇️</strong> – pohyb dole</li>
+      </ul>
+      <p>Podržaním <strong>Shift</strong> získate krátkodobý „boost“.  
+      Cieľ: prejsť všetky kolá v čo najkratšom čase.  
+      Ak opustíte dráhu, pripočítajú sa vám +5 s.</p>
+      <button id="closeHelp">Zatvoriť nápovedu</button>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
