@@ -1,3 +1,4 @@
+// index.js (server)
 const express   = require('express');
 const http      = require('http');
 const path      = require('path');
@@ -14,68 +15,83 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/race' });
 
 wss.on('connection', ws => {
+  // heartbeat
   ws.isAlive = true;
   ws.on('pong', () => ws.isAlive = true);
 
-  // najdi nebo vytvoř hru
+  // find or create a waiting game
   let game = games.find(g => !g.started && g.players.length < 2);
   if (!game) {
     game = {
       id:       games.length + 1,
       players:  [],
       state:    {},
-      laps:     3,
+      laps:     3,     // default laps
       started:  false,
       finished: false,
-      results:  {}
+      results:  { p0: null, p1: null },
+      interval: null
     };
     games.push(game);
   }
 
+  // assign this socket a player slot
   const idx = game.players.length;
-  game.players.push(ws);
-  ws.gameId      = game.id;
   ws.playerIndex = idx;
+  ws.gameId      = game.id;
+  game.players.push(ws);
+  game.state['p' + idx] = { name: null, color: null };
 
-  // pozdrav nového klienta
+  // tell the client its index
   ws.send(JSON.stringify({
     type: 'joined',
     data: { playerIndex: idx, gameId: game.id }
   }));
 
-  // start když jsou 2 hráči
-  if (game.players.length === 2) {
-    game.started           = true;
-    game.results.startTime = Date.now();
-    game.state = {
-      p0: { x:0, y:0, speed:0, lap:0, name:null, color:null, input:null },
-      p1: { x:0, y:3, speed:0, lap:0, name:null, color:null, input:null }
-    };
-    game.players.forEach((client, i) => {
-      client.send(JSON.stringify({
-        type: 'start',
-        data: { laps: game.laps, yourIndex: i }
-      }));
-    });
-    game.interval = setInterval(() => gameLoop(game), 1000 / TICK_RATE);
-  }
-
   ws.on('message', raw => {
     let m;
     try { m = JSON.parse(raw); } catch { return; }
 
-    // hráč posílá své jméno, barvu a počet kol
+    // handle join: name, color, and laps from first player only
     if (m.type === 'join') {
       const key = 'p' + ws.playerIndex;
-      game.laps = m.laps || game.laps;
-      if (game.state[key]) {
-        game.state[key].name  = m.name;
-        game.state[key].color = m.color;
+      game.state[key].name  = m.name;
+      game.state[key].color = m.color;
+      if (ws.playerIndex === 0) {
+        // only first player’s laps selection is used
+        game.laps = m.laps || game.laps;
+      }
+
+      // when both players are joined & named, start the race
+      if (!game.started
+          && game.players.length === 2
+          && game.state.p0.name
+          && game.state.p1.name) {
+        game.started           = true;
+        game.results.startTime = Date.now();
+
+        // broadcast start to both clients
+        game.players.forEach((c, i) => {
+          c.send(JSON.stringify({
+            type: 'start',
+            data: {
+              laps:      game.laps,
+              yourIndex: i,
+              players: [
+                { name: game.state.p0.name, color: game.state.p0.color },
+                { name: game.state.p1.name, color: game.state.p1.color }
+              ]
+            }
+          }));
+        });
+
+        // begin game loop
+        game.interval = setInterval(() => gameLoop(game), 1000 / TICK_RATE);
       }
       return;
     }
 
-    // hráč posílá pohyb → přepošli všem ostatním včetně jejich indexu
+    // relay movement to the other client
     if (m.type === 'move') {
       const payload = {
         type: 'player-move',
@@ -96,24 +112,66 @@ wss.on('connection', ws => {
       return;
     }
 
-    // (přesunuto ze starého kódu — nepotřebné pro tuto úpravu)
-    if (m.type === 'input') {
-      const key = 'p' + ws.playerIndex;
-      if (game.state[key]) game.state[key].input = m.data;
+    // handle finish from client
+    if (m.type === 'finish') {
+      game.results['p' + ws.playerIndex] = m.time;
+
+      // inform both players about this finish
+      game.players.forEach(c => {
+        if (c.readyState === WebSocket.OPEN) {
+          c.send(JSON.stringify({
+            type: 'playerFinish',
+            data: { name: m.name, time: m.time }
+          }));
+        }
+      });
+
+      // if both finished, send the overall finish
+      const r0 = game.results.p0, r1 = game.results.p1;
+      if (!game.finished && r0 != null && r1 != null) {
+        game.finished = true;
+        clearInterval(game.interval);
+        const finishMsg = {
+          type: 'finish',
+          data: {
+            players: [
+              { name: game.state.p0.name, time: r0 },
+              { name: game.state.p1.name, time: r1 }
+            ]
+          }
+        };
+        game.players.forEach(c => {
+          if (c.readyState === WebSocket.OPEN) {
+            c.send(JSON.stringify(finishMsg));
+          }
+        });
+      }
       return;
     }
   });
 
   ws.on('close', () => {
-    clearInterval(game.interval);
-    game.finished = true;
-    const i = games.findIndex(g => g.id === game.id);
-    if (i !== -1) games.splice(i,1);
+    // clean up: remove this socket from its game
+    const g = games.find(g => g.id === ws.gameId);
+    if (!g) return;
+    g.players = g.players.filter(c => c !== ws);
+
+    if (g.players.length === 0) {
+      // no players left, delete the game
+      if (g.interval) clearInterval(g.interval);
+      const i = games.findIndex(x => x.id === g.id);
+      if (i !== -1) games.splice(i, 1);
+    } else {
+      // one player left: stop the loop
+      g.finished = true;
+      if (g.interval) clearInterval(g.interval);
+    }
   });
 });
 
 function gameLoop(game) {
   const dt = 1 / TICK_RATE;
+
   ['p0','p1'].forEach(key => {
     const p = game.state[key];
     if (!p.input) return;
@@ -125,7 +183,6 @@ function gameLoop(game) {
       if (p.lap > game.laps && game.results[key] == null) {
         const t = (Date.now() - game.results.startTime) / 1000;
         game.results[key] = t;
-        // okamžitě pošli zprávu, že tento hráč dokončil
         game.players.forEach(c => {
           if (c.readyState === WebSocket.OPEN) {
             c.send(JSON.stringify({
@@ -141,15 +198,15 @@ function gameLoop(game) {
     }
   });
 
-  // průběžný broadcast stavu (nejsou důležité pro zobrazení soupeře, ale lze ponechat)
-  const payload = { type:'state', data: game.state };
+  // optional broadcast of full state
+  const payload = { type: 'state', data: game.state };
   game.players.forEach(c => {
     if (c.readyState === WebSocket.OPEN) {
       c.send(JSON.stringify(payload));
     }
   });
 
-  // když oba dokončí, pošli finish všem
+  // final finish check
   const r0 = game.results.p0, r1 = game.results.p1;
   if (!game.finished && r0 != null && r1 != null) {
     clearInterval(game.interval);
@@ -171,6 +228,7 @@ function gameLoop(game) {
   }
 }
 
+// heartbeat ping/pong
 setInterval(() => {
   wss.clients.forEach(ws => {
     if (!ws.isAlive) return ws.terminate();
